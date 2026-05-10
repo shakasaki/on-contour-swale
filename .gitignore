@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+.venv/
+
+# Local cache (regeneratable from raw data via load_swale_dataset)
+cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swale"
+version = "0.1.0"
+description = "Time-series loader and analysis for soil-sensor data at Sadhana Forest swale site"
+requires-python = ">=3.10"
+dependencies = [
+    "polars>=1.20",
+    "fastexcel>=0.13",
+    "openpyxl>=3.1",
+    "scipy>=1.11",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "mne>=1.7",
+    "pywavelets>=1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: tests that touch the real on-disk dataset",
+]
