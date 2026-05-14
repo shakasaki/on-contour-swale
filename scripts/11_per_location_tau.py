@@ -30,6 +30,7 @@ import numpy as np
 import polars as pl
 
 from swale.config import load_settings
+from swale.hillshade import load_canonical_hillshade
 from swale.sites import sensor_pairs
 from swale.spatial_frame import load_canonical_dem_mesh
 
@@ -56,6 +57,12 @@ MARKER_SIZE_MIN = 80
 MARKER_SIZE_MAX = 700
 LABEL_PIXEL_OFFSET = 8
 CMAP_TAU = "magma_r"            # darker = slower drainage = higher tau
+
+# Hillshade base layer (canonical frame, cropped to DEM mesh bbox).
+HILLSHADE_AZDEG = 315.0         # NW illumination
+HILLSHADE_ALTDEG = 45.0
+HILLSHADE_VERT_EXAG = 5.0
+HILLSHADE_ALPHA = 0.55          # blend strength against the white canvas
 
 
 def get_dem_bbox() -> tuple[float, float, float, float] | None:
@@ -87,8 +94,19 @@ def aggregate_tau(df: pl.DataFrame) -> pl.DataFrame:
 
 def plot_map(ax, depth_cm: int, agg: pl.DataFrame,
               pairs_by_sid: dict, dem_bbox: tuple | None,
+              hillshade: tuple | None,
               vmin: float, vmax: float):
     """Render one map panel for the given depth."""
+    # Hillshade base layer (under everything else)
+    if hillshade is not None:
+        hs_img, hs_extent = hillshade
+        ax.imshow(
+            hs_img, origin="lower", extent=hs_extent,
+            cmap="gray", vmin=0.0, vmax=1.0,
+            alpha=HILLSHADE_ALPHA, interpolation="nearest",
+            aspect="equal", zorder=0,
+        )
+
     sub = agg.filter(
         (pl.col("depth_cm") == depth_cm)
         & (pl.col("n_good_fits") >= N_MIN_GOOD_FITS)
@@ -166,6 +184,14 @@ def main() -> None:
 
     dem_bbox = get_dem_bbox()
 
+    print("Loading averaged-XYZ hillshade (cropped to DEM mesh) ...")
+    hillshade = load_canonical_hillshade(
+        azdeg=HILLSHADE_AZDEG,
+        altdeg=HILLSHADE_ALTDEG,
+        vert_exag=HILLSHADE_VERT_EXAG,
+    )
+    print(f"  shape={hillshade[0].shape}  extent={hillshade[1]}")
+
     # Shared colour scale across both depths so the comparison is direct.
     good_taus = agg.filter(
         pl.col("n_good_fits") >= N_MIN_GOOD_FITS
@@ -180,7 +206,8 @@ def main() -> None:
                               constrained_layout=True)
     sc_last = None
     for ax, depth in zip(axes, DEPTHS):
-        sc = plot_map(ax, depth, agg, pairs_by_sid, dem_bbox, vmin, vmax)
+        sc = plot_map(ax, depth, agg, pairs_by_sid, dem_bbox,
+                      hillshade, vmin, vmax)
         if sc is not None:
             sc_last = sc
 
