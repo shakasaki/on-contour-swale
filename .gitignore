@@ -10,6 +10,13 @@ __pycache__/
 # Local cache (regeneratable from raw data via load_swale_dataset)
 cache/
 
+# Raw data dumps from the METER ZL6 portal (zips + unpacked CSVs).
+# Treated as a working directory; canonical inputs live in /home/alexis/DATA/swale.
+data/
+
+# Excel lock files (open spreadsheet in LibreOffice creates these).
+.~lock.*#
+
 # Editor / OS
 .vscode/
 .idea/

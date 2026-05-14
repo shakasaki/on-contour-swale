@@ -1,0 +1,16 @@
+{
+  "equilibration": {
+    "days_default": 14,
+    "days_overrides": {},
+    "variables": ["moisture", "soil_temp", "bulk_ec"]
+  },
+  "data": {
+    "data_root": "/home/alexis/DATA/swale",
+    "metadata_xlsx": "/home/alexis/git/sadhana/swale/data/Metadata.xlsx",
+    "rain_gauge_valid_until": "2025-06-22"
+  },
+  "treatment_colors": {
+    "swale": "#1f77b4",
+    "control": "#d62728"
+  }
+}
