@@ -3,6 +3,104 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-05-11 — 2026-05-14 — config, equilibration, CSV check, PET, Widmer mapping, LGAR notes
+
+### Added
+- `config/settings.json` — central tunables (equilibration days, data
+  paths, treatment colors). 14 d global default for the equilibration
+  cutoff with a per-sensor `days_overrides` dict.
+- `src/swale/config.py` — `load_settings()`, `apply_equilibration_cutoff`,
+  `per_sensor_first_valid`. The equilibration helper drops rows where
+  `timestamp < first_valid + days_for(sensor)` for the configured
+  variables (`moisture`, `soil_temp`, `bulk_ec`).
+- `scripts/check_new_data_dump.py` — unzips `data/All-z6-*.zip` into
+  `data/unpacked/<serial>/`, reads via `read_logger_csv`, diffs against
+  the cache on (logger, port, variable, timestamp). Writes per-(sensor,
+  variable) summary to `plots/check_new_data_dump.csv` and prints
+  headline counts + top 20 disagreements. Read-only — does not touch
+  the cache.
+- `01_data_quality.py: plot_equilibration()` — per-sensor first-N-days
+  grid (rows = SMS sensors, cols = moisture/soil_temp/bulk_ec) with the
+  cutoff line drawn at `equilibration.days_default`. Output:
+  `plots/01_equilibration.png`.
+- `scripts/08_pet_hargreaves.py` — daily PET via Hargreaves-Samani
+  from the ATMOS-14 air-temp record on logger 19570. Implements
+  Widmer §3.4 Eqs. 3–7 with two units corrections (FAO-1998 solar
+  constant in MJ/m²/min; Ra converted from MJ/m²/day to mm/day via
+  the latent heat of vaporisation). Outputs `plots/08_pet_daily.csv`
+  and `plots/08_pet_overview.png` (PET vs daily rainfall).
+- `scripts/sensor_mapping_widmer.py` + `plots/sensor_mapping_widmer.csv`
+  — cross-check of our SMS01–16 metadata against Widmer (2024) Table 6
+  (p. 32) by `(treatment, tag→Widmer-location, depth)`. Two known
+  caveats flagged in the script (Widmer's Step 0.1 m sensor 3 has no
+  equivalent in our metadata; `down`/`far` → `Bottom slope 1/2` is
+  presumed).
+- `07_recession_fits.py: plots/07_recession_fits_examples_loglog.png`
+  — log-log version of the example tails. Natural view for
+  distinguishing exponential from power-law behaviour visually.
+- `notes/lgar_design_choices.md` + `config/lgar_setup.json` — working
+  reference for reproducing Widmer (2024) with LGAR-Py. Every input
+  cited to its thesis section / equation / table.
+- `notes/recession_tail_richards.{tex,pdf}` — short derivation of the
+  Boussinesq / Richards basis for the exponential vs power-law tail
+  fits in `07_recession_fits.py`.
+
+### Changed
+- Scripts renumbered to a single linear pipeline (run order = filename
+  prefix; outputs share the prefix):
+  - `make_plots.py`          → `01_data_quality.py`
+  - `spectrum.py`            → `02_spectrum.py`
+  - `spectrum_mne.py`        → `02b_spectrum_mne.py`
+  - `spectrogram.py`         → `03_spectrogram.py`
+  - `event_response.py`      → `04_event_response.py`
+  - `01_rising_limb_metrics` → `05_rising_limb_metrics`
+  - `03_wetting_front_lag`   → `06_wetting_front_lag`
+  - `04_recession_fits`      → `07_recession_fits`
+  Plot outputs renamed accordingly (`weather.png` → `01_weather.png`,
+  `spectrogram_10cm_mexh.png` → `03_spectrogram_10cm_mexh.png`, etc.).
+- All analysis scripts now read `DATA_ROOT` and `METADATA` from
+  `config/settings.json` via `load_settings()` instead of hardcoded
+  paths. The metadata location moved from `/home/alexis/DATA/swale/
+  Metadata.xlsx` to `data/Metadata.xlsx` (the user's latest copy).
+- `.gitignore`: added `data/` (raw zip dumps and unpacked CSVs), the
+  LibreOffice `.~lock.*#` pattern, `external/` (vendored LGAR-Py
+  reference checkout), the Widmer thesis PDF, and the LaTeX build
+  artifacts under `notes/`.
+
+### Findings (informal, from this session)
+- Mean Hargreaves-Samani PET ≈ 4–5 mm/day (≈ 1500–1800 mm/yr) over
+  the observed record — higher than Widmer's cited Thornthwaite
+  estimate of ~2.3 mm/day (855 mm/yr; 63 % of rainfall). Likely
+  because Hargreaves-Samani over-predicts in humid/tropical climates
+  unless calibrated; worth flagging before any model forcing.
+- New CSV portal dump extends coverage from 2026-02-04 → 2026-05-11
+  (~3 months past the existing cache).
+- Moisture agrees with the cache within 3-decimal CSV display rounding
+  (median disagreement ~0.001 m³/m³; effectively zero divergences past
+  tolerance). The hybrid XLSX-preferred loader is the right call —
+  switching to CSV-only would only save the bulk_ec aliasing artifact.
+- bulk_ec disagreements (~56k per sensor on 05511) are the known
+  XLSX "Bulk EC" vs CSV "Saturation Extract EC" semantic mismatch.
+  No change of that picture from the new dump.
+- SMS10 decision: keep as the 5th swale-40 cm sensor. The `Step??`
+  location and `tag = step` are noted but the explicit `treatment =
+  swale` and `depth = 40` are honored as authoritative.
+- SMS17–22 don't exist in the metadata; SMS23/24 already excluded
+  via null treatment. Nothing to change for "drop SMS17–24".
+
+### Known issues (new this session)
+- Logger 19574, port 3+ (SMS06 + SMS08): the XLSX side of the cache
+  reports systematically wrong `soil_temp` from 2024-11-29 to
+  2025-05-02 (median diff 1.7–3 °C, max 9 °C; v_cache appears stuck
+  at 25.5 °C). Likely one bad XLSX snapshot winning dedup. Tracked
+  but not fixed this session.
+- The cache has a tagging anomaly on `ATMOS14_19570`: a subset of
+  rows are stored with `sensor_type = 'TEROS12'` for
+  moisture/soil_temp/bulk_ec — almost certainly a port-5 collision
+  between an early CSV (TEROS12) and the current XLSX (ATMOS14).
+  `01_data_quality.plot_equilibration` filters to `SMS*` IDs as a
+  defensive workaround; the underlying typing is still wrong.
+
 ## 2026-05-10 — infiltration analysis session
 
 ### Added

@@ -1,16 +1,38 @@
 # TODO
 
-## 2026-05-08
+## 2026-05-14
+
+- [ ] **40 cm treatment difference drill-down — spatial phase** (top priority, in progress). Now that `data/SMS_locations.csv` gives metric (X,Y,Z) per sensor pair, plot the 5 swale + 3 control pairs in their actual layout and re-look at the τ ≈ 3261 h swale-40 cm signature per-location instead of pooled. Hypothesise mechanism (which location is buffering: mound? trench? step?) and test against more events.
+- [ ] **DEM↔sensor coordinate registration**. `data/DEM/DEM_2024_07_25.{txt,las,shp,vtk}` is in a different local frame from `SMS_locations.csv` (DEM X ≈ 10–12, sensors X ≈ −12 to +6). Need an alignment step (rigid rotation+translation, or pick common landmarks) before overlaying sensors on hillshade.
+- [ ] Event-based drydown analysis on a curated subset of events from `plots/00_events_from_soil.csv`.
+- [ ] **Logger 19574 soil_temp XLSX anomaly** (SMS06 + SMS08): xlsx-side cache values diverge from CSV by 1.7–9 °C over 2024-11-29 → 2025-05-02 with v_cache stuck at 25.5 °C. Investigate the bad XLSX snapshot, decide whether to deprefer it or rewrite the dedup rule on that window.
+- [ ] **Cache typing anomaly on ATMOS14_19570**: a subset of rows are stored with `sensor_type = 'TEROS12'` for moisture/soil_temp/bulk_ec. Trace through the port-5 history on logger 19570 and fix in the reader or loader.
+- [ ] Optional follow-up on time-frequency: swale-minus-control difference TFRs to highlight where the treatments diverge in frequency-time.
+- [ ] Optional: discrete Haar (DWT) decomposition for sharp-transition characterisation.
+
+## Backlog (carried over)
 
 - [ ] **Rain gauge inspection** (logger 19570). Silent from 2025-06-22 22:15 onward; data flow healthy, values pegged at 0.0. Likely mechanical jam or disconnected lead. Until repaired, all rain-driven analysis is bounded above by 2025-06-22.
 - [ ] Look for older XLSX snapshots that extend XLSX coverage of loggers 05511 and 19570 past Feb 2025 — if found, ingest them and re-evaluate whether the bulk_ec / saturation-extract-EC aliasing is still acceptable.
-- [ ] Apply the per-sensor first-week (or first-fortnight) cutoff to drop sensor-equilibration data before analysis. Decide cadence per channel: day 0–3 is unusable across the board; soil_temp clean by ~day 2; EC on a few control sensors keeps drifting through ~day 12.
-- [ ] Decide what to do with SMS10 (`Location='Step??'`, treatment derived from explicit column = swale, depth = 40 cm). Currently included in 40 cm swale analysis as a 5th sensor; user count of "4 swale at 40 cm" suggests it may not be intended as a swale comparison sensor. Either rename location, set treatment to null, or accept inclusion.
-- [ ] Decide whether to keep SMS23 / SMS24 (`Location = ?`) — currently excluded (null treatment + null depth).
-- [ ] Drill into the **40 cm treatment difference**: control 40 cm sits at 0.30–0.45 m³/m³, swale 40 cm at 0.05–0.10. Hypothesise mechanism (mound geometry, lateral flow, soil profile difference) and test against more events.
-- [ ] Event-based drydown analysis: pick a subset of events from `plots/rain_events.csv`, fit exponential decay to the post-rain recession at each depth × treatment, compare drydown timescales.
-- [ ] Optional follow-up on time-frequency: swale-minus-control difference TFRs to highlight where the treatments diverge in frequency-time. (Spectrograms alone aren't very discriminating between treatments per current view.)
-- [ ] Optional: discrete Haar (DWT) decomposition for sharp-transition characterisation. The current `mexh` CWT covers most of this need; DWT would only be worth it if dyadic-scale energy partitioning becomes useful.
+- [ ] Re-ingest the post-2026-02-04 portion of the new CSV dump into the cache (extends record by ~3 months). `check_new_data_dump.py` confirms moisture agreement is rock solid.
+
+## Done in 2026-05-11 – 2026-05-14 session
+
+- [x] Inspected the new METER CSV dump in `data/All-z6-*.zip`; wrote `scripts/check_new_data_dump.py` to diff vs cache and dropped headline numbers in CHANGELOG.
+- [x] Added `config/settings.json` + `swale.config` helper. 14 d global equilibration cutoff with per-sensor overrides.
+- [x] Auxiliary `plots/01_equilibration.png` per-sensor first-21-days panel grid added to `01_data_quality.py`.
+- [x] Renumbered scripts so run order = filename prefix; renamed plot outputs to match.
+- [x] SMS10 disposition: kept as the 5th swale-40 cm sensor (user decision).
+- [x] Verified SMS17–22 don't exist; SMS23/24 already excluded via null treatment.
+- [x] Daily Hargreaves-Samani PET (`scripts/08_pet_hargreaves.py`).
+- [x] Widmer Table 6 cross-check (`scripts/sensor_mapping_widmer.py`).
+- [x] LGAR-Py reference setup notes (`notes/lgar_design_choices.md`, `config/lgar_setup.json`).
+- [x] Recession-tail derivation note (`notes/recession_tail_richards.{tex,pdf}`).
+
+## Issues
+
+- [issue] `bulk_ec` step jump of 1.7–3.3 mS/cm at ~2025-02-04 on loggers 05511 + 19570 is a source-switch artifact (Bulk EC vs Saturation Extract EC aliased). Diagnostic in `plots/diag_bulk_ec.png` and `plots/boundary_report.csv`. Fix deferred — see `memory/bulk_ec_source_artifact.md`.
+- [issue] Rain gauge on logger 19570 reports continuous 0 mm from 2025-07 onward through 2026-02 (~8 months) despite ~8928 rows/month being logged at 5-min cadence. 2024-08 had 323 mm; 2025-08 has 0 mm. Almost certainly a physical fault (clogged tipping bucket, stuck mechanism, or detached lead). Action: have the gauge inspected on-site; meanwhile any analysis that relies on rain forcing is restricted to ≤ 2025-06.
 
 ## Done in this session
 
