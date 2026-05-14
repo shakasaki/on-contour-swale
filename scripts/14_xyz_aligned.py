@@ -22,13 +22,12 @@ Run from project root::
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pyvista as pv
 
+from swale.spatial_frame import load_canonical_dem_mesh, xyz_rotation_table_default
 from swale.xyz_align import (
     apply_transform,
     compute_or_load_histogram,
@@ -51,19 +50,16 @@ MIN_POINTS_FOR_BIN = 2
 REFERENCE_FILENAME = "24.05.30_-_con_sw_and_for_2_12_44_34.xyz"
 
 # Per-file (flip_ud, rot_cw_steps) transform. Add overrides as we
-# inspect the rendered plots. The default falls back to the reference
-# transform below.
-#
-# Composed transform: the raw scan is flipped vertically (mirror across
-# horizontal axis). No additional rotation. After this, North = +Y.
-# Earlier iterations added a 90° CW rotation, then a 90° CCW rotation
-# to get North on the Y axis; the two rotations cancel, so the net
-# is just the up-down flip.
+# inspect the rendered plots. The default comes from
+# :func:`swale.spatial_frame.xyz_rotation_table_default` — i.e. flip
+# vertically (to align the raw scan with the raw DEM frame) and then
+# rotate 180 degrees (to reach the canonical +X=East / +Y=North frame
+# shared by all map plots).
+DEFAULT_TRANSFORM = xyz_rotation_table_default()
 ROTATION_TABLE: dict[str, tuple[bool, int]] = {
     # filename -> (flip_ud, rot_cw_steps)
-    REFERENCE_FILENAME: (True, 0),
+    REFERENCE_FILENAME: DEFAULT_TRANSFORM,
 }
-DEFAULT_TRANSFORM = (True, 0)
 
 
 def transform_for(filename: str) -> tuple[bool, int]:
@@ -73,9 +69,7 @@ def transform_for(filename: str) -> tuple[bool, int]:
 def get_dem_bbox() -> tuple[float, float, float, float] | None:
     if not DEM_MESH.exists():
         return None
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        m = pv.read(DEM_MESH)
+    m = load_canonical_dem_mesh(DEM_MESH)
     b = m.bounds
     return b.x_min, b.x_max, b.y_min, b.y_max
 
@@ -122,8 +116,8 @@ def render_aligned(
                 label="Mesh_swale_site.vtk extent")
         ax.legend(loc="upper left", fontsize=8, frameon=True)
 
-    ax.set_xlabel("X (m, aligned frame)")
-    ax.set_ylabel("Y (m, aligned frame)")
+    ax.set_xlabel("X (m, canonical frame; +X = East)")
+    ax.set_ylabel("Y (m, canonical frame; +Y = North)")
     ax.set_title(
         f"{filename}\n"
         f"transform: flip_ud={flip_ud}, rot_cw_steps={rot_cw_steps}  |  "
@@ -156,8 +150,8 @@ def render_coverage(
                 [by0, by0, by1, by1, by0],
                 color="red", lw=2.5, ls="--", alpha=0.9,
                 label="Mesh_swale_site.vtk extent")
-    ax.set_xlabel("X (m, aligned frame)")
-    ax.set_ylabel("Y (m, aligned frame)")
+    ax.set_xlabel("X (m, canonical frame; +X = East)")
+    ax.set_ylabel("Y (m, canonical frame; +Y = North)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.3)
     ax.set_title(

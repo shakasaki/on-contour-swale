@@ -27,13 +27,12 @@ end of the dug feature), not the topographic top of the hillslope.
 The DEM shows the swale sits in the *lower* part of the local
 terrain; the higher ground is east, where the control plot lies.
 
-DEM frame alignment
--------------------
-The SMS_locations frame and the DEM frame share the same X/Y origin
-and orientation (the swale ends up at the same position in both).
-The earlier-seen mismatch between the SMS X range (~-7 to +6) and a
-naive read of the DEM .txt file was an artifact of reading the wrong
-column ordering; the .vtk file confirms alignment.
+Spatial frame
+-------------
+``load_sensor_pairs`` applies the project-wide raw->canonical sign
+flip (see :mod:`swale.spatial_frame`) to X and Y before returning,
+so the SensorPair x/y values are in the canonical frame:
+``+X = East``, ``+Y = North``. Z is returned as-is (already up-positive).
 """
 
 from __future__ import annotations
@@ -42,6 +41,8 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+from swale.spatial_frame import to_canonical_xy
 
 
 @dataclass(frozen=True)
@@ -133,11 +134,13 @@ def load_sensor_pairs(csv_path: Path) -> list[SensorPair]:
             if not row or not row[0].strip():
                 continue
             try:
-                x = float(row[10]); x_std = float(row[11])
-                y = float(row[12]); y_std = float(row[13])
+                x_raw = float(row[10]); x_std = float(row[11])
+                y_raw = float(row[12]); y_std = float(row[13])
                 z = float(row[14]); z_std = float(row[15])
             except (IndexError, ValueError):
                 continue
+
+            x, y = to_canonical_xy(x_raw, y_raw)
 
             sensor_ids = _parse_sensor_ids(row[0])
             treatment_loc = _WIDMER_LOCATION_BY_PAIR.get(sensor_ids, (None, None))

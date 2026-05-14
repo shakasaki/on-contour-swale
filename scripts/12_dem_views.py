@@ -30,6 +30,7 @@ import pyvista as pv
 
 from swale.config import load_settings
 from swale.sites import load_sensor_pairs, sensor_pairs
+from swale.spatial_frame import load_canonical_dem_mesh
 
 # ---------------------------------------------------------------------------
 # Project layout
@@ -55,25 +56,20 @@ DPI_XY = 220                       # 2-D plot DPI — push for detail
 CONTOUR_INTERVAL_M = 0.10          # contour spacing in metres
 CONTOUR_MAJOR_EVERY = 5            # every Nth contour gets the labelled style
 
-# Camera for the 3D screenshot: looking from the south-west toward the
-# sensor area, slightly elevated. The sensors live near (X ~ 5, Y ~ 5)
-# so we point the focal point there. PyVista accepts
-# (position, focal_point, view_up).
+# Camera for the 3D screenshot, in the canonical frame
+# (+X = East, +Y = North). Looking from the south-west (negative X,
+# negative Y) toward the sensor cluster (swale around X~-5, Y~-6).
+# PyVista accepts (position, focal_point, view_up).
 CAMERA_3D = [
-    (-15.0, -15.0, 10.0),          # position
-    ( 0.0,   3.0,  0.0),           # focal point near the sensor cluster
-    ( 0.0,   0.0,  1.0),           # view up
+    (-25.0, -25.0, 10.0),          # position: SW of the site, slightly elevated
+    ( -3.0,  -4.0,  0.0),           # focal point near the sensor cluster
+    (  0.0,   0.0,  1.0),           # view up
 ]
 
 
 def load_mesh() -> pv.PolyData:
-    """Load the cleaned site mesh; warns are silenced."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        mesh = pv.read(DEM_MESH)
-    if mesh.n_points == 0:
-        raise RuntimeError(f"no points in {DEM_MESH}")
-    return mesh
+    """Load the site mesh in the canonical frame (+X=East, +Y=North)."""
+    return load_canonical_dem_mesh(DEM_MESH)
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +97,7 @@ def plot_xy(mesh: pv.PolyData, out: Path) -> None:
     # That preserves the raw resolution of the mesh.
     tpc = ax.tripcolor(tri_obj, z, shading="flat", cmap=CMAP)
     cbar = fig.colorbar(tpc, ax=ax, shrink=0.7, pad=0.02)
-    cbar.set_label("Elevation Z (m, DEM frame)")
+    cbar.set_label("Elevation Z (m)")
 
     # Contour lines over the elevation field.
     z_min, z_max = z.min(), z.max()
@@ -188,8 +184,8 @@ def plot_xy(mesh: pv.PolyData, out: Path) -> None:
     ax.legend(handles=legend_handles, loc="upper right",
               fontsize=9, frameon=True, framealpha=0.95)
 
-    ax.set_xlabel("X (m, DEM frame)  [axis inverted]")
-    ax.set_ylabel("Y (m, DEM frame)  [axis inverted: north at top]")
+    ax.set_xlabel("X (m, canonical frame; +X = East)")
+    ax.set_ylabel("Y (m, canonical frame; +Y = North)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.20)
     ax.set_title(
@@ -200,8 +196,6 @@ def plot_xy(mesh: pv.PolyData, out: Path) -> None:
         f"(major every {CONTOUR_MAJOR_EVERY * CONTOUR_INTERVAL_M:.2f} m)",
         fontsize=10.5,
     )
-    ax.invert_xaxis()
-    ax.invert_yaxis()
     fig.tight_layout()
     fig.savefig(out, dpi=DPI_XY)
     plt.close(fig)

@@ -31,12 +31,26 @@ class Equilibration:
 
 
 @dataclass(frozen=True)
+class SpatialFrame:
+    """Sign multipliers that map raw (X, Y) to the canonical frame.
+
+    Canonical convention: +X = East, +Y = North, +Z = up. Multiply raw
+    x and y by these signs at load time so every downstream consumer
+    (loaders, helpers, plots) sees data already in the canonical frame.
+    """
+
+    raw_x_sign: int
+    raw_y_sign: int
+
+
+@dataclass(frozen=True)
 class Settings:
     equilibration: Equilibration
     data_root: Path
     metadata_xlsx: Path
     rain_gauge_valid_until: str
     treatment_colors: dict[str, str]
+    spatial_frame: SpatialFrame
     raw: dict[str, Any]
 
 
@@ -59,12 +73,17 @@ def load_settings(path: Path | None = None) -> Settings:
         variables=tuple(eq.get("variables", ["moisture", "soil_temp", "bulk_ec"])),
     )
     data = raw["data"]
+    sf = raw.get("spatial_frame", {"raw_x_sign": 1, "raw_y_sign": 1})
     return Settings(
         equilibration=equilibration,
         data_root=Path(data["data_root"]),
         metadata_xlsx=Path(data["metadata_xlsx"]),
         rain_gauge_valid_until=str(data["rain_gauge_valid_until"]),
         treatment_colors=dict(raw.get("treatment_colors", {})),
+        spatial_frame=SpatialFrame(
+            raw_x_sign=int(sf["raw_x_sign"]),
+            raw_y_sign=int(sf["raw_y_sign"]),
+        ),
         raw=raw,
     )
 

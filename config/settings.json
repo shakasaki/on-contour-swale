@@ -5,12 +5,17 @@
     "variables": ["moisture", "soil_temp", "bulk_ec"]
   },
   "data": {
-    "data_root": "/home/alexis/DATA/swale",
+    "data_root": "/home/alexis/DATA/sadhana/swale",
     "metadata_xlsx": "/home/alexis/git/sadhana/swale/data/Metadata.xlsx",
     "rain_gauge_valid_until": "2025-06-22"
   },
   "treatment_colors": {
     "swale": "#1f77b4",
     "control": "#d62728"
+  },
+  "spatial_frame": {
+    "raw_x_sign": -1,
+    "raw_y_sign": -1,
+    "description": "Sign multipliers applied to raw (X, Y) of every spatial source (DEM mesh, SMS_locations.csv, .xyz scans) at load time. Canonical frame is +X=East, +Y=North, +Z=up. See src/swale/spatial_frame.py."
   }
 }

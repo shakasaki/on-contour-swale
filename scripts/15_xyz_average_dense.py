@@ -26,8 +26,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pyvista as pv
 
+from swale.spatial_frame import load_canonical_dem_mesh, xyz_rotation_table_default
 from swale.xyz_align import apply_transform, compute_or_load_histogram
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,9 +40,11 @@ OUT_STD = ROOT / "plots" / "15_xyz_stddev_per_bin.png"
 OUT_COMPARE = ROOT / "plots" / "15_xyz_average_vs_single.png"
 
 BINS_XY = (1000, 1000)
-# Net transform: vertical flip only (North = +Y after the flip).
-# Earlier we composed flip + CW 90 + CCW 90; the two rotations cancel.
-TRANSFORM = {"flip_ud": True, "rot_cw_steps": 0}
+# Net transform to reach the canonical frame (+X=East, +Y=North):
+# flip vertically (aligns raw scan with raw DEM frame), then rotate
+# 180 degrees (raw DEM -> canonical). See swale.spatial_frame.
+_FLIP_UD, _ROT_CW = xyz_rotation_table_default()
+TRANSFORM = {"flip_ud": _FLIP_UD, "rot_cw_steps": _ROT_CW}
 MIN_POINTS_FOR_BIN = 2
 CMAP_Z = "terrain"
 CMAP_STD = "viridis"
@@ -60,9 +62,7 @@ DENSE_FILES = [
 def get_dem_bbox() -> tuple[float, float, float, float] | None:
     if not DEM_MESH.exists():
         return None
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        m = pv.read(DEM_MESH)
+    m = load_canonical_dem_mesh(DEM_MESH)
     b = m.bounds
     return b.x_min, b.x_max, b.y_min, b.y_max
 
@@ -142,8 +142,8 @@ def plot_field(arr: np.ndarray,
                 color="red", lw=1.5, alpha=0.7,
                 label="Mesh_swale_site.vtk extent")
         ax.legend(loc="upper left", fontsize=8, frameon=True)
-    ax.set_xlabel("X (m, aligned frame)")
-    ax.set_ylabel("Y (m, aligned frame)")
+    ax.set_xlabel("X (m, canonical frame; +X = East)")
+    ax.set_ylabel("Y (m, canonical frame; +Y = North)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.2)
     ax.set_title(title, fontsize=11)
@@ -180,8 +180,8 @@ def plot_average_vs_single(
         im = ax.imshow(img, origin="lower", extent=ext_t,
                         cmap=CMAP_Z, interpolation="nearest", aspect="equal",
                         vmin=vmin, vmax=vmax)
-        ax.set_xlabel("X (m, aligned)")
-        ax.set_ylabel("Y (m, aligned)")
+        ax.set_xlabel("X (m, canonical; +X = East)")
+        ax.set_ylabel("Y (m, canonical; +Y = North)")
         ax.set_title(title, fontsize=11)
         ax.grid(alpha=0.2)
         if dem_bbox is not None:

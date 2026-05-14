@@ -1,12 +1,11 @@
 """Plan-view map of the soil-moisture sensor pairs.
 
-Reads ``data/SMS_locations.csv`` via ``swale.sites`` and plots all SMS
-pairs in their measured (X, Y) frame, colour-coded by treatment and
-labelled by Widmer-thesis location (Top slope / Mound / Step /
-Bottom slope 1+2 for the swale; Top / Mid / Bottom slope for the
-control). Z is encoded as marker fill colour so the slope direction
-shows visually. Z is elevation (positive up); the loader negates the
-raw CSV Z so upslope = higher.
+Reads ``data/SMS_locations.csv`` via ``swale.sites`` (which already
+returns coords in the canonical frame: +X=East, +Y=North) and plots
+all SMS pairs colour-coded by treatment and labelled by Widmer-thesis
+location (Top slope / Mound / Step / Bottom slope 1+2 for the swale;
+Top / Mid / Bottom slope for the control). Z is encoded as marker
+fill colour so the slope direction shows visually.
 
 Outputs:
     plots/09_sensor_layout.png
@@ -138,8 +137,8 @@ def plot_layout(out: Path) -> None:
     ax.legend(handles=[swale_proxy, control_proxy, unc_proxy],
               loc="upper left", fontsize=10, frameon=True)
 
-    ax.set_xlabel("X (m)  [axis inverted to match Widmer Fig. 6 orientation]")
-    ax.set_ylabel("Y (m)  [axis inverted: top slope at top of figure]")
+    ax.set_xlabel("X (m, canonical frame; +X = East)")
+    ax.set_ylabel("Y (m, canonical frame; +Y = North)")
     ax.set_aspect("equal")
     ax.grid(alpha=0.3)
 
@@ -147,10 +146,6 @@ def plot_layout(out: Path) -> None:
     ax.set_xlim(xs.min() - 0.8, xs.max() + 0.8)
     ax.set_ylim(ys.min() - 0.8, ys.max() + 0.8)
 
-    # Flip both axes: swale on the left (matches Widmer Fig. 6), and
-    # top slope at the top of the figure (matches map-north orientation).
-    ax.invert_xaxis()
-    ax.invert_yaxis()
     ax.set_title(
         "TEROS-12 sensor pair locations — plan view\n"
         "5 swale pairs + 3 control triples; Z encoded as fill colour. "
