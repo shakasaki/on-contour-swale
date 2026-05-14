@@ -1,37 +1,47 @@
-"""Quick exploratory plots over the consolidated swale dataset.
+"""Data-quality overview + sensor equilibration diagnostics.
 
 Run from the project root::
 
-    PYTHONPATH=src python3 scripts/make_plots.py
+    PYTHONPATH=src python3 scripts/01_data_quality.py
 
-Two figures land in plots/:
+Outputs in plots/:
 
-  weather.png : Precipitation (daily total), air temperature, relative
-                humidity, atmospheric pressure — all from logger 19570
-                (Top of Swale).
-  soil.png    : Soil moisture, soil temperature, bulk EC, faceted by
-                depth (rows) and colored by treatment (swale vs control).
+  01_weather.png        : Precipitation (daily total), air temperature, RH,
+                          atmospheric pressure — all from logger 19570.
+  01_soil.png           : Soil moisture, soil temperature, bulk EC, faceted
+                          by depth (rows) × treatment (color).
+  01_equilibration.png  : Per-sensor first-N-days view (cutoff line drawn
+                          at ``equilibration.days_default`` from settings),
+                          one row per sensor, columns = variables.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import polars as pl
 
+from swale.config import load_settings, per_sensor_first_valid
 from swale.loader import load_swale_dataset
 
 # Project layout
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 
-# Treatment palette (consistent across figures).
-COLOR = {"swale": "#1f77b4", "control": "#d62728"}
+# Treatment palette (consistent across figures). From settings.
+COLOR = dict(SETTINGS.treatment_colors)
+
+# How many days past first_valid to show in the equilibration figure (wider
+# than the cutoff so you can see the settling and a few days of post-cutoff
+# steady state side-by-side).
+EQUILIBRATION_PLOT_DAYS = SETTINGS.equilibration.days_default + 7
 
 
 # ---------------------------------------------------------------------------
@@ -207,11 +217,108 @@ def plot_soil(df: pl.DataFrame, out: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Equilibration figure
+# ---------------------------------------------------------------------------
+
+EQUILIBRATION_VARIABLES: list[tuple[str, str]] = [
+    ("moisture",  "VWC (m³/m³)"),
+    ("soil_temp", "Soil temp (°C)"),
+    ("bulk_ec",   "Bulk EC (mS/cm)"),
+]
+
+
+def plot_equilibration(df: pl.DataFrame, out: Path) -> None:
+    """Per-sensor first-N-days panel grid with the equilibration cutoff drawn.
+
+    Rows: TEROS12 sensors sorted by ``sensor_id``. Columns: variables in
+    ``EQUILIBRATION_VARIABLES``. Each panel plots raw values for the first
+    ``EQUILIBRATION_PLOT_DAYS`` after that sensor's first non-null reading,
+    with a vertical dashed line at the equilibration cutoff
+    (``first_valid + equilibration.days_for(sensor)``). Useful for sanity-
+    checking whether the chosen cutoff actually removes the settling
+    transient for each channel.
+    """
+    # SMS-prefix filter: the cache has a pre-existing tagging anomaly where
+    # ATMOS14_19570 has a few rows mislabelled as TEROS12. Stick to the soil-
+    # moisture sensors by ID prefix and the figure stays clean regardless.
+    soil = df.filter(
+        (pl.col("sensor_type") == "TEROS12")
+        & pl.col("sensor_id").str.starts_with("SMS")
+    )
+    fv = per_sensor_first_valid(soil).sort("sensor_id")
+    sensor_ids = fv["sensor_id"].to_list()
+    if not sensor_ids:
+        return
+
+    n_rows = len(sensor_ids)
+    n_cols = len(EQUILIBRATION_VARIABLES)
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(3.5 * n_cols, 1.5 * n_rows),
+        sharex=False,
+    )
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+
+    fv_map = dict(zip(fv["sensor_id"].to_list(), fv["first_valid"].to_list()))
+
+    for row_i, sensor_id in enumerate(sensor_ids):
+        t0 = fv_map[sensor_id]
+        t_end = t0 + timedelta(days=EQUILIBRATION_PLOT_DAYS)
+        cutoff_days = SETTINGS.equilibration.days_for(sensor_id)
+        t_cut = t0 + timedelta(days=cutoff_days)
+        sensor_rows = soil.filter(
+            (pl.col("sensor_id") == sensor_id)
+            & (pl.col("timestamp") >= t0)
+            & (pl.col("timestamp") < t_end)
+        )
+        treatment = sensor_rows["treatment"].drop_nulls().first() if sensor_rows.height else None
+        color = COLOR.get(treatment, "#444")
+
+        for col_i, (var, ylabel) in enumerate(EQUILIBRATION_VARIABLES):
+            ax = axes[row_i, col_i]
+            sub = (sensor_rows
+                   .filter(pl.col("variable") == var)
+                   .sort("timestamp"))
+            if sub.height:
+                ax.plot(sub["timestamp"].to_list(), sub["value"].to_list(),
+                        color=color, linewidth=0.6)
+            ax.axvline(t_cut, color="black", linestyle="--", linewidth=0.8,
+                       alpha=0.7)
+            ax.set_xlim(t0, t_end)
+            if col_i == 0:
+                ax.set_ylabel(f"{sensor_id}\n({treatment or '?'})", fontsize=8)
+            if row_i == 0:
+                ax.set_title(ylabel, fontsize=10, weight="bold")
+            ax.tick_params(axis="both", labelsize=7)
+            ax.grid(alpha=0.25)
+
+        # Only label x-axis ticks on the bottom row.
+        for col_i in range(n_cols):
+            if row_i == n_rows - 1:
+                axes[row_i, col_i].xaxis.set_major_locator(mdates.DayLocator(interval=5))
+                axes[row_i, col_i].xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+            else:
+                axes[row_i, col_i].set_xticklabels([])
+
+    fig.suptitle(
+        f"Sensor equilibration ({EQUILIBRATION_PLOT_DAYS} days from first reading; "
+        f"dashed line = equilibration cutoff at {SETTINGS.equilibration.days_default} d)",
+        fontsize=12, weight="bold",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     PLOTS.mkdir(exist_ok=True)
+    print(f"Equilibration default: {SETTINGS.equilibration.days_default} d "
+          f"(overrides for {len(SETTINGS.equilibration.days_overrides)} sensors)")
     print("Loading dataset (cached if available)…")
     df = load_swale_dataset(
         data_root=DATA_ROOT,
@@ -221,12 +328,15 @@ def main() -> None:
     )
     print(f"  {df.height:,} rows")
 
-    weather_path = PLOTS / "weather.png"
-    soil_path = PLOTS / "soil.png"
-    print(f"Plotting weather → {weather_path}")
+    weather_path = PLOTS / "01_weather.png"
+    soil_path    = PLOTS / "01_soil.png"
+    eq_path      = PLOTS / "01_equilibration.png"
+    print(f"Plotting weather       → {weather_path}")
     plot_weather(df, weather_path)
-    print(f"Plotting soil    → {soil_path}")
+    print(f"Plotting soil          → {soil_path}")
     plot_soil(df, soil_path)
+    print(f"Plotting equilibration → {eq_path}")
+    plot_equilibration(df, eq_path)
     print("Done.")
 
 
