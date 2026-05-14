@@ -1,14 +1,25 @@
 # TODO
 
-## 2026-05-14
+## 2026-05-14 — open
 
-- [ ] **40 cm treatment difference drill-down — spatial phase** (top priority, in progress). Now that `data/SMS_locations.csv` gives metric (X,Y,Z) per sensor pair, plot the 5 swale + 3 control pairs in their actual layout and re-look at the τ ≈ 3261 h swale-40 cm signature per-location instead of pooled. Hypothesise mechanism (which location is buffering: mound? trench? step?) and test against more events.
-- [ ] **DEM↔sensor coordinate registration**. `data/DEM/DEM_2024_07_25.{txt,las,shp,vtk}` is in a different local frame from `SMS_locations.csv` (DEM X ≈ 10–12, sensors X ≈ −12 to +6). Need an alignment step (rigid rotation+translation, or pick common landmarks) before overlaying sensors on hillshade.
-- [ ] Event-based drydown analysis on a curated subset of events from `plots/00_events_from_soil.csv`.
+- [ ] **40 cm drill-down, event-level phase**. Per-location τ map now shows the slow-drainage at swale 40 cm concentrates at Bottom slope 1+2 (SMS07/09), not at the Mound or Step. Next: event-by-event drilldown — compare a handful of large events at SMS07/09 vs SMS05/10 vs control SMS12/14/16 to see which events drive the per-sensor τ spread. Curated subset from `plots/00_events_from_soil.csv`.
+- [ ] **SMS 6,7 vs SMS 8,9 position question in `SMS_locations.csv`** (user-owned). The Widmer-location vs surveyed-XY mapping for Bottom slope 1 vs 2 needs a source-data check; user said "I need to dig into the data to fix this".
+- [ ] **SMS02 (Top slope swale, 40 cm) has only 1 good recession fit.** The Top slope 40 cm rarely responds enough to fit clean recessions. Either lower R² threshold for this sensor, or accept the data-poor caveat in any per-location summary.
 - [ ] **Logger 19574 soil_temp XLSX anomaly** (SMS06 + SMS08): xlsx-side cache values diverge from CSV by 1.7–9 °C over 2024-11-29 → 2025-05-02 with v_cache stuck at 25.5 °C. Investigate the bad XLSX snapshot, decide whether to deprefer it or rewrite the dedup rule on that window.
 - [ ] **Cache typing anomaly on ATMOS14_19570**: a subset of rows are stored with `sensor_type = 'TEROS12'` for moisture/soil_temp/bulk_ec. Trace through the port-5 history on logger 19570 and fix in the reader or loader.
 - [ ] Optional follow-up on time-frequency: swale-minus-control difference TFRs to highlight where the treatments diverge in frequency-time.
 - [ ] Optional: discrete Haar (DWT) decomposition for sharp-transition characterisation.
+
+## Done in the 2026-05-14 spatial drill-down session
+
+- [x] **Sensor layout map** with Widmer-location labels + uncertainty ellipse (`scripts/09_sensor_layout.py`, `plots/09_sensor_layout.png`).
+- [x] **Per-location VWC time series** (`scripts/10_per_location_vwc.py`, `plots/10_per_location_vwc_{10,40}cm.png`).
+- [x] **Per-location recession τ map** with hillshade base + DEM bbox overlay (`scripts/11_per_location_tau.py`, `plots/11_per_location_tau_map.png`). Reveals that the slow drainage at swale 40 cm concentrates at Bottom slope 1+2 (SMS07 τ=103 h, SMS09 τ=132 h), not uniformly across the swale.
+- [x] **DEM 2-D + 3-D views** (`scripts/12_dem_views.py`). Top-down `tripcolor` with 0.10 m contours; PyVista oblique with 2× Z exaggeration.
+- [x] **XYZ scan inventory** (`scripts/13_xyz_inventory.py`) — memory-bounded streaming summary of all 22 raw scans; trims `data/DEM_xyz/` from 22 to 17 files (5 dense `con_sw_and_for_*` + 12 task-specific scans) after confirming the 5 dense scans are independent measurements of the same area with sub-cm registration.
+- [x] **XYZ rotation table + aligned plots** (`scripts/14_xyz_aligned.py`) + **5-scan average** (`scripts/15_xyz_average_dense.py`).
+- [x] **DEM↔sensor coordinate registration → canonical frame.** Spec'd in `config/settings.json:spatial_frame` and implemented in `src/swale/spatial_frame.py`. **+X = East, +Y = North, +Z = up.** Loaders (sites.py, DEM mesh helper, XYZ rotation default) apply the raw→canonical transform at load time, so every map plot draws natively with no `invert_*axis()` tricks.
+- [x] **Canonical-frame hillshade base layer** from the averaged 5 dense scans, cropped to the DEM mesh extent (`src/swale/hillshade.py`). Layered under the τ map.
 
 ## Backlog (carried over)
 

@@ -3,6 +3,129 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-05-14 — spatial drill-down: sensor layout, DEM, XYZ scans, canonical frame, per-location plots, hillshade
+
+### Added
+- `src/swale/sites.py` — `SensorPair` dataclass + `load_sensor_pairs()`
+  reading `data/SMS_locations.csv` (3 measurements per pair averaged
+  in the source CSV; we use the `_av` columns). Maps each pair to its
+  Widmer location (Top slope / Mound / Step / Bottom slope 1+2 for
+  the swale; Top / Mid / Bottom slope for the control). Coords are
+  returned in the canonical frame (see spatial frame below).
+- `src/swale/xyz_streaming.py` — memory-bounded streaming I/O for
+  raw `.xyz` point clouds. `summarize_xyz()` (pass 1: extents +
+  count) and `histogram2d_xyz()` (pass 2: zsum / count grid).
+  Autodetects comma vs whitespace separator; reorders columns
+  `(X, V_vert, W_horiz)` → `(X, Y, Z)` for the Y-up raw scan format.
+- `src/swale/xyz_align.py` — disk-cached histograms in
+  `cache/xyz_histograms/<safe>__NxN.npz` so iterating on rotations
+  doesn't restream the 6.6 GB source. `apply_transform()` composes a
+  vertical flip with `N × 90°` clockwise rotations (the D4 dihedral
+  group), updating both `image` and `extent` consistently.
+- **`src/swale/spatial_frame.py`** — single source of truth for
+  map-view orientation: **+X = East, +Y = North, +Z = up**. Sign
+  multipliers (`raw_x_sign = -1`, `raw_y_sign = -1`) read from
+  `config/settings.json:spatial_frame` and applied at load time by
+  `load_sensor_pairs`, `load_canonical_dem_mesh`, and the default
+  XYZ rotation. With these signs the raw survey frame is rotated
+  180° to the canonical one. No `ax.invert_*axis()` calls anywhere
+  in the project.
+- `src/swale/hillshade.py` — combines the 5 cached dense
+  `con_sw_and_for_*` histograms, projects to canonical, crops to the
+  DEM mesh bbox, and computes a luminance hillshade via
+  `matplotlib.colors.LightSource` (NW illumination, 45° altitude,
+  5× vertical exaggeration by default). Reusable as a base layer
+  under any plan-view scatter.
+- `scripts/09_sensor_layout.py` — plan view of all 8 sensor pairs
+  with Widmer location labels, treatment-coloured ring markers,
+  Z-as-fill colour, and a 2σ uncertainty ellipse for SMS 10.
+- `scripts/10_per_location_vwc.py` — replaces the pooled-by-
+  treatment VWC view of `01_data_quality` with a spatially-indexed
+  one: one panel per sensor, ordered along the slope (Top → Step →
+  Mound → Bottom 1 → Bottom 2 for the swale; Top → Mid → Bottom
+  for the control), one figure per depth.
+- `scripts/11_per_location_tau.py` — per-sensor median recession τ
+  on a plan-view map (one panel per depth). Markers coloured by
+  `log10(median τ)`, sized by N good fits; canonical-frame
+  hillshade as the base layer; DEM mesh bbox overlaid. Aggregates
+  `plots/07_recession_fits.csv` with `R² ≥ 0.7`, `τ ∈ [5, 500] h`,
+  `n_good ≥ 3`.
+- `scripts/12_dem_views.py` — `Mesh_swale_site.vtk` rendered in 2-D
+  (`tripcolor`, no smoothing, 0.10 m contours every line + 0.50 m
+  labelled majors) and in 3-D oblique (PyVista, off-screen, 2×
+  vertical exaggeration, sensor pairs as coloured spheres).
+- `scripts/13_xyz_inventory.py` — per-file streaming summary of all
+  raw scans under `data/DEM_xyz/`: point count, extents, mean-Z
+  grid per file, combined bounding-box plot, inventory CSV.
+  Diagnostic only — stays in the raw scan frame.
+- `scripts/14_xyz_aligned.py` — applies the rotation table to bring
+  each scan into the canonical frame. Per-file aligned plan view
+  PNGs in `plots/14_xyz_aligned/` plus a combined coverage plot.
+- `scripts/15_xyz_average_dense.py` — averages the 5 dense
+  `con_sw_and_for_*.xyz` scans (28.5 M points each, sub-cm
+  registration); reports per-bin std (median 0.1 cm), writes the
+  averaged grid, and produces a single-vs-average side-by-side.
+
+### Changed
+- `src/swale/config.py` gained `SpatialFrame` and parses the new
+  `spatial_frame` section of `settings.json`.
+- `scripts/{09,11,12,14,15}` consume canonical-frame data
+  directly; no axis-inversion tricks anywhere. The DEM 3-D camera
+  position was moved from `(-15, -15, 10)` to `(-25, -25, 10)`
+  with a focal point near the canonical sensor cluster so the
+  oblique view still looks "from the south-west".
+- `config/settings.json` — new `spatial_frame` block:
+  ```json
+  { "raw_x_sign": -1, "raw_y_sign": -1, "description": "..." }
+  ```
+- `data/DEM_xyz/` cleanup: kept one representative of the
+  redundant dense `con_sw_and_for_*` set + deleted the other 4
+  dense duplicates (4 GB) and the sparse `_2_12_44_34.xyz`
+  (343 MB). The 5 dense scans share extent to ~sub-cm and per-bin
+  Z std of ~1 mm, so averaging buys almost nothing beyond a single
+  scan; their cached histograms remain available for hillshade.
+
+### Findings (informal, from this session)
+- **Spatial layout matches Widmer Fig. 6 once the frame is set.**
+  The swale's "Top slope" is the upstream end of the dug
+  construction, not the topographic top of the hillslope — the DEM
+  shows the swale sits in the lower terrain, and the control plot
+  occupies the higher ground to the east.
+- **Z sign anomaly**: 5/8 sensor pairs match local DEM surface
+  elevation to within ~5 cm; 3 outliers (SMS 1+2, SMS 3+4+5, SMS
+  11+12) sit ~0.33–0.42 m below the DEM surface — close to the 40
+  cm install depth, so the surveyor likely recorded the buried-
+  sensor elevation rather than the surface marker for those rows.
+  Loader returns Z as-is and flags this in its docstring.
+- **Per-location recession τ (median across events, R² ≥ 0.7,
+  τ ∈ [5, 500] h)**:
+  - 10 cm: swale 73–113 h vs control 39–72 h. Slowest at SMS06
+    (Bottom slope 1, 113 h) and SMS04 (Mound, 99 h). Swale ~1.5–2×
+    slower than control at every location.
+  - 40 cm: swale 69–132 h vs control 43–54 h. Slowest at SMS09
+    (Bottom slope 2, 132 h) and SMS07 (Bottom slope 1, 103 h).
+    SMS05 (Mound) and SMS10 (Step) drain near control rate.
+- **The earlier "swale 40 cm τ ≈ 3261 h" headline was a fitting
+  artifact**: it came from pooled fits dominated by pathological
+  tails where the recession barely fits an exponential. Within
+  physically reasonable τ (≤ 500 h), the swale 40 cm runs only
+  ~1.5–2× slower than control, with the slow-drainage signature
+  concentrating at the **downslope foot** of the swale (Bottom
+  slopes 1 + 2) rather than uniformly across the construction.
+- **SMS02 (Top slope swale, 40 cm) has only 1 good fit** (τ ≈
+  263 h) — the Top slope 40 cm rarely responds enough to fit a
+  clean recession. Excluded from the per-location map (n ≥ 3
+  threshold) but flagged for follow-up.
+
+### Known issues / open
+- The "SMS 6,7 vs SMS 8,9" label/position question in
+  `SMS_locations.csv` remains user-owned; user said "I need to
+  dig into the data to fix this".
+- Hillshade source uses only the 5 dense `con_sw_and_for_*` scans
+  (the only multi-scan area). The other 13 raw scans cover
+  smaller patches and would each need per-file rotation tuning to
+  composite cleanly.
+
 ## 2026-05-11 — 2026-05-14 — config, equilibration, CSV check, PET, Widmer mapping, LGAR notes
 
 ### Added
