@@ -74,10 +74,17 @@ def load_settings(path: Path | None = None) -> Settings:
     )
     data = raw["data"]
     sf = raw.get("spatial_frame", {"raw_x_sign": 1, "raw_y_sign": 1})
+
+    # Resolve metadata_xlsx relative to the repo root if it isn't absolute
+    # — so the project survives directory renames without a config edit.
+    metadata_path = Path(data["metadata_xlsx"])
+    if not metadata_path.is_absolute():
+        metadata_path = _REPO_ROOT / metadata_path
+
     return Settings(
         equilibration=equilibration,
         data_root=Path(data["data_root"]),
-        metadata_xlsx=Path(data["metadata_xlsx"]),
+        metadata_xlsx=metadata_path,
         rain_gauge_valid_until=str(data["rain_gauge_valid_until"]),
         treatment_colors=dict(raw.get("treatment_colors", {})),
         spatial_frame=SpatialFrame(

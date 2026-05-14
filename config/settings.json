@@ -6,7 +6,7 @@
   },
   "data": {
     "data_root": "/home/alexis/DATA/sadhana/swale",
-    "metadata_xlsx": "/home/alexis/git/sadhana/swale/data/Metadata.xlsx",
+    "metadata_xlsx": "data/Metadata.xlsx",
     "rain_gauge_valid_until": "2025-06-22"
   },
   "treatment_colors": {
