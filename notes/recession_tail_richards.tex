@@ -1,0 +1,223 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Physical reading of the exponential recession-tail fit\\
+       \large Linearised Richards equation and the swale dataset}
+\author{Alexis Shakas \\ \small{ETH Z\"urich, shakasa@ethz.ch}}
+\date{\today}
+
+\newcommand{\dpartial}[2]{\frac{\partial #1}{\partial #2}}
+
+\begin{document}
+
+\maketitle
+
+\section{Richards' equation in one dimension}
+
+For a homogeneous, isothermal soil column with vertical coordinate $z$
+(positive downward), volumetric water content $\theta(z,t)$,
+unsaturated hydraulic conductivity $K(\theta)$ and matric head
+$h(\theta)$, mass conservation combined with the Buckingham--Darcy law
+gives the mixed-form Richards equation
+\begin{equation}
+    \dpartial{\theta}{t}
+    \;=\;
+    \dpartial{}{z}\!\left[
+        D(\theta)\,\dpartial{\theta}{z} \;-\; K(\theta)
+    \right]
+    \;-\;
+    S(\theta,z,t),
+    \label{eq:richards}
+\end{equation}
+where $D(\theta) = K(\theta)\,\partial h/\partial\theta$ is the
+hydraulic diffusivity and $S(\theta,z,t)$ is the root-uptake / direct
+evaporation sink. The nonlinearity is concentrated in $D(\theta)$ and
+$K(\theta)$, both of which vary by several orders of magnitude across
+the unsaturated range.
+
+\section{Linearisation around a wetting peak}
+
+After a rainfall event the soil moisture relaxes toward an
+approximately uniform baseline $\theta_b(z)$. Write
+\begin{equation}
+    \theta(z,t) \;=\; \theta_b(z) + \theta'(z,t),
+    \qquad
+    |\theta'| \ll \theta_b.
+\end{equation}
+Freezing the soil-hydraulic functions at $\theta_b$ and dropping terms
+of order $\theta'^2$ converts Eq.~\eqref{eq:richards} into a
+linear advection--diffusion--reaction equation in $\theta'$:
+\begin{equation}
+    \dpartial{\theta'}{t}
+    \;=\;
+    D_b\,\dpartial{^2\theta'}{z^2}
+    \;-\;
+    K_b'\,\dpartial{\theta'}{z}
+    \;-\;
+    \lambda\,\theta',
+    \label{eq:linrichards}
+\end{equation}
+with constant coefficients
+\begin{equation}
+    D_b = D(\theta_b),
+    \qquad
+    K_b' = \frac{dK}{d\theta}\bigg|_{\theta_b},
+    \qquad
+    \lambda = \frac{\partial S}{\partial\theta}\bigg|_{\theta_b} \;\ge\; 0.
+\end{equation}
+
+\section{Eigenvalue spectrum and the single-mode regime}
+
+Substituting the standard advection-removing transform
+$\theta'(z,t) = \exp\!\big(\frac{K_b' z}{2 D_b}\big)\,\psi(z,t)$ converts
+Eq.~\eqref{eq:linrichards} into a pure diffusion equation with a
+constant-rate sink:
+\begin{equation}
+    \dpartial{\psi}{t}
+    \;=\;
+    D_b\,\dpartial{^2\psi}{z^2}
+    \;-\;
+    \left[\,\frac{K_b'^{\,2}}{4 D_b} + \lambda\,\right]\!\psi.
+\end{equation}
+On a layer of effective depth $L$, the eigenvalues of the slowest
+decaying spatial mode (the value of which depends on the boundary
+conditions chosen at $z=0$ and $z=L$) take the canonical form
+\begin{equation}
+    \boxed{\;
+    \frac{1}{\tau_n}
+    \;=\;
+    \underbrace{D_b\!\left(\frac{n\pi}{L}\right)^{\!2}}_{\text{vertical
+        diffusion mode } n}
+    \;+\;
+    \underbrace{\frac{K_b'^{\,2}}{4 D_b}}_{\text{gravity
+        advection}}
+    \;+\;
+    \underbrace{\vphantom{\frac{K_b'^{\,2}}{4 D_b}}\lambda}_{\text{ET sink}},
+    \;}
+    \label{eq:tau-sum}
+\end{equation}
+where $n=1,2,3,\dots$ The recession is dominated by the fundamental
+mode ($n=1$) within a few $\tau_1$ of the peak. With
+mixed Dirichlet--Neumann boundaries (closed surface, fixed-$\theta$
+bottom into a water table) the prefactor on the diffusion term reads
+$\pi^2 D_b/(4 L^2)$ instead of $\pi^2 D_b/L^2$. Either way, the
+\emph{form} of Eq.~\eqref{eq:tau-sum} is the same: a single
+characteristic timescale built additively from three physical
+processes.
+
+\paragraph{Diagnostic.} If a recession is well described by a single
+$\tau$ (high R$^2$ for $\theta'(t) = A\,e^{-t/\tau} + C$) and the
+corresponding power-law exponent $\alpha$ is near zero, the soil is in
+this single-eigenmode regime. Higher modes have already decayed and
+no heterogeneity-induced heavy tail is visible.
+
+\section{Comparison with alternative tail models}
+
+Different physical regimes produce qualitatively different recession
+shapes:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{} l l l @{}}
+\toprule
+Regime & Recession shape & Diagnostic exponent \\
+\midrule
+Linearised Richards (single mode) & $\theta \propto e^{-t/\tau}$ & $\alpha \approx 0$ \\
+Capillary diffusion, semi-infinite half-space & $\theta \propto t^{-1/2}$ & $\alpha \approx 0.5$ \\
+Boussinesq groundwater, late time & $\theta \propto t^{-2}$ & $\alpha \approx 2$ \\
+Brutsaert--Nieber, $dQ/dt = -aQ^b$ & $\theta \propto t^{-1/(b-1)}$ & $\alpha = 1/(b-1)$ \\
+Distribution of pore-drainage times & $\sum_i A_i e^{-t/\tau_i}$ & apparent power-law over a window \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For the swale data the median fits give $\alpha = 0.006$--$0.04$ and
+exponential R$^2$ consistently above the power-law R$^2$ across all
+(depth, treatment) cells. This places the system in the single-mode
+linear-reservoir regime and justifies using $\tau$ as the primary
+descriptor.
+
+\section{Inverting the fitted \texorpdfstring{$\tau$}{tau} for soil parameters}
+
+When the three contributions to Eq.~\eqref{eq:tau-sum} cannot be
+separated from a single trace, the fitted $\tau$ provides only an
+\emph{upper bound} on the diffusion timescale:
+\begin{equation}
+    D_b \;\le\; \frac{L^2}{\pi^2\,\tau}.
+    \label{eq:D-bound}
+\end{equation}
+For $L = \SI{10}{cm}$ and the swale-dataset medians:
+
+\begin{center}
+\begin{tabular}{@{} l l c r r @{}}
+\toprule
+Depth & Treatment & $\tau$ (h) & $\tau$ (s) & $D_b$ upper bound (\si{\meter\squared\per\second}) \\
+\midrule
+\SI{10}{cm} & control & 56   & $2.0\times 10^{5}$ & $5.0\times 10^{-9}$ \\
+\SI{10}{cm} & swale   & 85   & $3.1\times 10^{5}$ & $3.3\times 10^{-9}$ \\
+\SI{40}{cm} & control & 73   & $2.6\times 10^{5}$ & $3.9\times 10^{-9}$ \\
+\SI{40}{cm} & swale   & 3261 & $1.2\times 10^{7}$ & $8.6\times 10^{-11}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The control 10 / 40 \si{cm} numbers ($\sim 10^{-9}\,\si{m^2/s}$) sit in
+the canonical range for unsaturated loam near field capacity. The
+swale 10\,cm bound is $\sim 30\%$ lower than control. The swale
+40\,cm bound is two orders of magnitude smaller than control 40\,cm
+and cannot be reconciled with any realistic $D_b$: it is the
+signature of a regime where the diffusion mode is not the
+rate-limiter at all.
+
+\section{Why the swale 40\,cm $\tau$ blows up}
+
+Eq.~\eqref{eq:tau-sum} says $1/\tau$ is a sum of non-negative
+contributions, so $\tau \to \infty$ only when \emph{all three}
+collapse simultaneously:
+\begin{itemize}
+\item the diffusion mode is suppressed (a saturated boundary clamps
+      $\theta'$ from below, or a low-permeability layer blocks
+      vertical flux);
+\item gravity advection $K_b'$ vanishes (the gravitational gradient is
+      balanced by a continuous lateral inflow that re-supplies water
+      faster than gravity drains it); and
+\item the ET sink $\lambda$ is small (deep root demand is weak at
+      \SI{40}{cm}, or the available water in the perched layer is large
+      compared to weekly demand).
+\end{itemize}
+
+Of these three, sustained lateral inflow from upslope mounds is the
+most parsimonious single explanation, and is the one we can test
+independently: it predicts a wetting-front lag at \SI{40}{cm} that
+\emph{matches} \SI{10}{cm} of the same plot rather than the
+\SI{40}{cm} of the control plot.
+
+\section{What a Richards-model inversion would add}
+
+The linear-reservoir model collapses three independent physical
+processes into a single observable $\tau$. To separate them one
+needs either:
+\begin{enumerate}
+\item A \emph{vertical-profile constraint}: two depths in the same
+      column with shared $D_b$ but different surface coupling. Each
+      depth provides one equation in $\{D_b, K_b', \lambda\}$. The
+      current 10\,cm \& 40\,cm pair already gives this.
+\item An \emph{independent ET estimate}: ATMOS\,14 vapour-pressure
+      deficit and air temperature constrain $\lambda$ separately. We
+      have these data on logger \texttt{Z6-19570}.
+\item A \emph{forward Richards solver} (e.g.\ HYDRUS-1D / phydrus)
+      with the measured rainfall as upper boundary and observed
+      $\theta(z,t)$ as the inversion target, returning
+      van~Genuchten / Mualem retention parameters $(\theta_r,
+      \theta_s, \alpha_\text{vG}, n, K_s)$ per layer and treatment.
+      Option (3) subsumes (1)--(2) and quantifies the lateral-inflow
+      hypothesis as a residual.
+\end{enumerate}
+
+\end{document}

@@ -17,6 +17,21 @@ data/
 # Excel lock files (open spreadsheet in LibreOffice creates these).
 .~lock.*#
 
+# Third-party reference checkouts vendored under external/ (e.g. LGAR-Py).
+external/
+
+# Heavy upstream PDFs kept locally but not in repo history.
+notes/Masters_thesis_*.pdf
+
+# LaTeX build artifacts (only for our own writeups under notes/).
+notes/*.aux
+notes/*.log
+notes/*.out
+notes/*.fls
+notes/*.fdb_latexmk
+notes/*.synctex.gz
+notes/*.toc
+
 # Editor / OS
 .vscode/
 .idea/

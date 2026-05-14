@@ -1,0 +1,224 @@
+{
+  "_meta": {
+    "purpose": "Inputs and parameter choices for an LGAR-Py reproduction of Widmer (2024). Every value is either copied or derived from the MSc thesis. Sources are explicit; placeholder values (where we'll iterate) are marked TODO.",
+    "thesis": "Widmer, N. (2024). Quantifying subsurface water movement in a reforestation initiative through geophysical monitoring. MSc thesis, ETH Zurich. notes/Masters_thesis_Neomi_Widmer_18-115-303-1.pdf",
+    "thesis_citation_style": "{section} (p. {page}), Eq. {n}, Table {n}"
+  },
+
+  "site": {
+    "latitude_deg":  1.9807,
+    "longitude_deg": 79.7766,
+    "elevation_m_asl_approx": 15,
+    "slope_pct": 5,
+    "water_table_depth_m_below_ground": 1.8,
+    "regional_geology": "Cuddalore sandstone (Mid-Pliocene, iron-rich arkosic) with patches of Manaveli clay in topographical lows",
+    "soil_type": "Ferralsol (Cuddalore-derived) with possible Plinthosol (Manaveli-derived)",
+    "vegetation": "Tropical dry evergreen forest; successional environment A (bushland: Acacia holosericea, Aristidia setacea, Chrysopogon fulvus); successional environment B (woodland, Acacia auriculiformis up to 30 m) bordering site",
+    "source": "Widmer §2.3.1-2.3.4 (pp. 7-10), §1 intro (p. 2)"
+  },
+
+  "climate": {
+    "koppen_geiger_class": "tropical savannah",
+    "mean_annual_temperature_degC": 27.8,
+    "hottest_month": { "name": "May", "mean_T_degC": 30.5 },
+    "coldest_month": { "name": "January", "mean_T_degC": 24.6 },
+    "mean_annual_precipitation_mm_1989_2018": 1357,
+    "monsoons": {
+      "SW_monsoon": { "months": "June-September" },
+      "NE_monsoon": { "months": "October-December", "share_of_total_P": "~2/3" }
+    },
+    "source": "Widmer §2.3.1 (p. 7); Meteo Atlas 2024, Climate-Data.org 2024, Gassama et al. 2012"
+  },
+
+  "PET_method": {
+    "method": "Hargreaves-Samani",
+    "reason_not_Penman_Monteith": "ATMOS-14 weather station does not record wind speed",
+    "formula":      "PET = 0.0023 * (T_max - T_min)^0.5 * (T_mean + 17.8) * R_a   [mm/day]",
+    "formula_Ra":   "R_a = (24*60/pi) * G_sc * d_r * [w_s*sin(phi)*sin(delta) + cos(phi)*cos(delta)*sin(w_s)]",
+    "formula_d_r":  "d_r = 1 + 0.033 * cos(2*pi*J/365)",
+    "formula_delta":"delta = 0.409 * sin(2*pi*J/365 - 1.39)",
+    "formula_ws":   "w_s = arccos(-tan(phi)*tan(delta))",
+    "constants": {
+      "G_sc_MJ_per_m2_per_day": 0.82,
+      "phi_rad":   "latitude_deg * pi/180"
+    },
+    "inputs_required": ["daily T_max", "daily T_min", "daily T_mean", "day of year J"],
+    "input_source_in_our_data": "logger 19570, port 5 (ATMOS-14), variable air_temp, aggregate to daily min/max/mean",
+    "source": "Widmer §3.4 (p. 23), Eq. 3-7; Hargreaves 1982; FAO 1998"
+  },
+
+  "soil_classification": {
+    "n_texture_samples": 27,
+    "sample_positions": "electrode positions 1, 5, 10 along all ER lines, both swale and control plots",
+    "lab": "Auroville Environmental Monitoring Services (AEMS)",
+    "method": "EMS SOIL 2000 sedimentation, Stokes' Law (clay/silt/sand mass fractions)",
+    "field_class_AEMS": "Silt Loam (majority of samples)",
+    "field_class_project_soil_scientist": "Sandy Clay Loam (also per Roeschli et al. 2021)",
+    "compromise_class_used": "Loam",
+    "rationale_for_compromise": "Significant influence of soil class on model parameters; AEMS samples and field judgement diverged; Loam covers both",
+    "source": "Widmer §3.5.1 (p. 27); EMS SOIL 2000; Roeschli et al. 2021"
+  },
+
+  "soil_hydraulic_parameters": {
+    "_comment": "van Genuchten + Mualem. Parameter ranges sourced from Widmer Tables 4 and 5 (p. 28); category = Loam.",
+    "theta_r_volumetric": {
+      "min": 0.120,
+      "max": 0.354,
+      "mean": 0.238,
+      "_comment": "Widmer uses observed minimum VWC at 10 cm as a proxy for residual water content θ_r. Lower bound is the observed minimum across all 10-cm sensors.",
+      "source": "Widmer Table 4 (p. 28), §3.5.1"
+    },
+    "theta_r_at_40cm_observed": {
+      "min": 0.268,
+      "max": 0.411,
+      "mean": 0.340,
+      "_comment": "Observed VWC range at 40 cm (different physical layer; not used as θ_r proxy in Widmer)",
+      "source": "Widmer Table 4 (p. 28)"
+    },
+    "theta_s_total_porosity": {
+      "min": 0.379,
+      "max": 0.464,
+      "mean": 0.422,
+      "n_samples": 18,
+      "_comment": "Total porosity computed as theta_s = 1 - rho_b/rho_s. Bulk density rho_b (g/cm3) from oven-dry (105 degC) cylindrical samples per Poeplau et al. 2017. Particle density rho_s gravimetric per Santos et al. 2022. 2 soil profiles analyzed.",
+      "source": "Widmer Table 4 (p. 28), §3.5.1 (p. 28), Eq. 17; Poeplau et al. 2017; Santos et al. 2022"
+    },
+    "K_s_saturated_hydraulic_conductivity": {
+      "units": "mm/h",
+      "min": 0.827,
+      "max": 19.289,
+      "mean": 5.060,
+      "database": "SoilKsatDB (Gupta et al. 2021)",
+      "category": "Loam",
+      "_comment_calibration": "Widmer's developer-suggested approach later: log-space sampling for K_s during calibration",
+      "source": "Widmer Table 5 (p. 28), §3.5.1; Gupta et al. 2021"
+    },
+    "alpha_vG_air_entry_inverse": {
+      "units": "1/mm",
+      "min": 0.000038,
+      "max": 0.000451,
+      "mean": 0.000245,
+      "units_per_cm_mean": 0.00245,
+      "units_per_m_mean": 0.245,
+      "reference": "Bohne et al. 1995",
+      "_comment": "Air-entry pressure parameter. Very low values (cf. typical 'loam' ~ 0.04 /cm) hint at fine-textured / clay-rich loam at our site (consistent with the kaolinite-rich Ferralsol). Log-space calibration suggested by LGAR-Py developer.",
+      "source": "Widmer Table 5 (p. 28); Bohne et al. 1995"
+    },
+    "n_vG": {
+      "min": 1.142,
+      "max": 1.229,
+      "mean": 1.186,
+      "reference": "Bohne et al. 1995",
+      "_comment": "n_vG values near 1.1-1.2 are characteristic of fine-textured soils (clay loam / silt clay). Far from coarse loam (n>1.5).",
+      "source": "Widmer Table 5 (p. 28); Bohne et al. 1995"
+    },
+    "m_vG": {
+      "min": 0.124,
+      "max": 0.186,
+      "mean": 0.155,
+      "formula": "m = 1 - 1/n",
+      "_comment": "Constrained by n_vG via the Mualem closure",
+      "source": "Widmer Table 5 (p. 28), §3.5 (p. 26)"
+    },
+    "l_pore_connectivity": {
+      "value": 0.5,
+      "_comment": "Mualem pore-connectivity parameter; default value used by Widmer per LGAR-Py / La Follette 2023",
+      "source": "Widmer §3.5 (p. 27), Eq. 14; Mualem 1976; La Follette et al. 2023"
+    }
+  },
+
+  "AET_reduction": {
+    "formula": "AET = PET * 1 / (1 + (psi / psi_50)^3)",
+    "psi_50_m_capillary_head": 0.75,
+    "_comment": "Capillary head at which AET = 0.5 * PET. AET demand is taken from the topmost wetting front per LGAR-Py.",
+    "ponded_head_used": false,
+    "ponded_head_rationale": "Site is sloping (5%); surface ponding for any duration is not expected",
+    "source": "Widmer §3.5 (p. 27), Eq. 16; Šimůnek et al. 2013"
+  },
+
+  "model": {
+    "package": "LGAR-Py (Layered Green-Ampt with Redistribution, Python)",
+    "package_paper": "La Follette et al. 2023, Water Resources Research, 10.1029/2022WR033742",
+    "code_repos_known": [
+      "https://www.hydroshare.org/resource/90951d952b034e7aa592898ab6d264eb/  (publication snapshot, Python)",
+      "https://github.com/NWC-CUAHSI-Summer-Institute/LGAR-py  (Python/torch fork)",
+      "https://github.com/NOAA-OWP/LGAR-C  (current maintained version, C — same algorithm; used inside LASAM)"
+    ],
+    "version_to_use": "Original LGAR-Py from the publication snapshot (HydroShare). Rationale: reproducibility with Widmer. The Python version is no longer actively maintained per upstream; the C version (LGAR-C / LASAM) is the current maintained implementation but we accept the unmaintained Python version for the comparison.",
+    "forcing_inputs": {
+      "precipitation_mm_per_h": {
+        "source": "logger 19570, port 6 (ECRN-100), variable precipitation",
+        "validity": "intact through 2025-06-22 22:15; silent thereafter (see memory rain_gauge_failure)"
+      },
+      "PET_mm_per_h": {
+        "source": "Hargreaves-Samani daily PET divided into hourly demand uniformly across daylight hours (Widmer treats PET on daily scale, plots as bars in Fig. 12)",
+        "_comment": "Widmer's plots show DAILY precipitation and PET (Fig. 12, p. 21). The LGAR model itself runs sub-daily."
+      }
+    },
+    "soil_column": {
+      "_comment": "Widmer does NOT explicitly describe column depth or layering in the methodology; the model is run as a single layer per the LGAR-Py demo. We will follow that.",
+      "n_layers": 1,
+      "single_layer_thickness_m": "TODO  (Widmer does not state explicitly; LGAR-Py demo column ~2 m)",
+      "source": "Widmer §3.5 (pp. 25-27), implicit from LGAR-Py demo"
+    }
+  },
+
+  "calibration_history_widmer": {
+    "_comment": "Documenting what Widmer tried so we don't repeat dead ends.",
+    "step_1_initial": "Run with mean parameter values from Tables 4-5 — poor fit",
+    "step_2_random_sampling": "10000 parameter sets randomly drawn within (min, max) ranges — poor fit",
+    "step_3_scipy_neldermead": "scipy.optimize.minimize, Nelder-Mead — no improvement",
+    "step_4_log_sampling_pyswarms": "Per LGAR-Py developer advice: log-space sampling of K_s and alpha, vary initial capillary head, minimize via PySwarms (particle-swarm) — no improvement",
+    "step_5_forcing_smoothing": "Redistribute 5-min rainfall into 1-hour intervals to broaden peaks — limited improvement",
+    "step_6_AET_PET_ratio_tweaks": "Manual modifications of AET/PET ratio — no improvement",
+    "observed_failure_modes": [
+      "Modeled VWC peaks too narrow vs observation",
+      "Modeled VWC returns to baseline too fast",
+      "Cannot reproduce slow VWC buildup at 0.4 m depth"
+    ],
+    "conclusion": "Widmer presents one event with the chosen parameters and discusses implications; quantitative inversion was abandoned",
+    "source": "Widmer §3.5.2 (pp. 28-29), Fig. 14"
+  },
+
+  "sensor_mapping": {
+    "_comment": "Widmer's Table 6 (p. 32) uses sensor numbers 1-16. Our SMS01-SMS16 numbering MAY OR MAY NOT match. Verify before any quantitative comparison.",
+    "widmer_layout_table_6": {
+      "1":  { "side": "Swale",   "location": "Top slope",      "depth_m": 0.1 },
+      "2":  { "side": "Swale",   "location": "Top slope",      "depth_m": 0.4 },
+      "3":  { "side": "Swale",   "location": "Step",           "depth_m": 0.1 },
+      "4":  { "side": "Swale",   "location": "Mound",          "depth_m": 0.1 },
+      "5":  { "side": "Swale",   "location": "Mound",          "depth_m": 0.4 },
+      "6":  { "side": "Swale",   "location": "Bottom slope 1", "depth_m": 0.1 },
+      "7":  { "side": "Swale",   "location": "Bottom slope 1", "depth_m": 0.4 },
+      "8":  { "side": "Swale",   "location": "Bottom slope 2", "depth_m": 0.1 },
+      "9":  { "side": "Swale",   "location": "Bottom slope 2", "depth_m": 0.4 },
+      "10": { "side": "Swale",   "location": "Step",           "depth_m": 0.4 },
+      "11": { "side": "Control", "location": "Top slope",      "depth_m": 0.1 },
+      "12": { "side": "Control", "location": "Top slope",      "depth_m": 0.4 },
+      "13": { "side": "Control", "location": "Mid slope",      "depth_m": 0.1 },
+      "14": { "side": "Control", "location": "Mid slope",      "depth_m": 0.4 },
+      "15": { "side": "Control", "location": "Bottom slope",   "depth_m": 0.1 },
+      "16": { "side": "Control", "location": "Bottom slope",   "depth_m": 0.4 }
+    },
+    "_action": "Cross-check against our Metadata.xlsx Serials tab before any comparison run",
+    "source": "Widmer Table 6 (p. 32)"
+  },
+
+  "data_window_widmer": {
+    "start": "2024-05-28 19:10",
+    "end":   "2024-09-16 18:10",
+    "n_rain_events_analyzed": 8,
+    "rain_event_filter": "events commencing with initial precipitation rate of 12 mm/h",
+    "post_event_window_h": 55,
+    "source": "Widmer §4.2 (p. 31), Table 2 (p. 22)"
+  },
+
+  "open_questions": [
+    "Verify SMS01-SMS16 ↔ Widmer sensor 1-16 mapping by joining on (location, depth)",
+    "Single column depth and bottom BC for LGAR-Py — Widmer doesn't state; need to pick (likely ~2 m or to water table at 1.8 m)",
+    "Initial condition: prior VWC profile at start of run. Widmer used 2024-05-28; we can extend earlier from logger commissioning",
+    "Whether to model swale and control as different parameter sets, or shared parameters with different forcing/BC",
+    "Vegetation/root water uptake: only AET reduction (psi_50 = 0.75 m) is used; no Feddes root distribution per layer",
+    "Numerical sensitivity not characterised in thesis (time step, spatial discretisation defaults)"
+  ]
+}
