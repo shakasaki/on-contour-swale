@@ -33,6 +33,7 @@ import polars as pl
 import seaborn as sns
 from matplotlib.gridspec import GridSpec
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 
 # ---------------------------------------------------------------------------
@@ -59,8 +60,9 @@ RAIN_LOGGER = "19570"
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 
@@ -221,7 +223,7 @@ def main() -> None:
     )
     print(f"  {df.height:,} rows")
 
-    out = PLOTS / f"event_{EVENT_DATE.strftime('%Y%m%d')}.png"
+    out = PLOTS / f"04_event_{EVENT_DATE.strftime('%Y%m%d')}.png"
     print(f"Plotting event window → {out}")
     plot_event(df, out)
     print("Done.")

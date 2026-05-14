@@ -42,6 +42,7 @@ from swale.events import (
     detect_events,
     match_events,
 )
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 
 # ---------------------------------------------------------------------------
@@ -76,8 +77,9 @@ DETECTION_DEPTH_CM = 10
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 

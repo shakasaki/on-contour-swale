@@ -37,6 +37,7 @@ import polars as pl
 import seaborn as sns
 from scipy import signal
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 from swale.preprocessing import (
     GRID_SECONDS,
@@ -46,8 +47,9 @@ from swale.preprocessing import (
 
 # Project layout
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 
@@ -199,7 +201,7 @@ def main() -> None:
     )
     print(f"  {df.height:,} rows")
 
-    short_out = PLOTS / "spectrum.png"
+    short_out = PLOTS / "02_spectrum.png"
     print(f"Computing 7-day-window PSDs → {short_out}")
     plot_spectrum(df, short_out,
                   nperseg_samples=NPERSEG,
@@ -210,7 +212,7 @@ def main() -> None:
     # finest frequency resolution). Setting nperseg = 365 d on a ~356 d
     # segment makes scipy clamp it down to len(detrended), giving a single
     # periodogram that reaches the lowest frequency the data can support.
-    long_out = PLOTS / "spectrum_long.png"
+    long_out = PLOTS / "02_spectrum_long.png"
     long_nperseg = 365 * SAMPLES_PER_DAY
     print(f"Computing full-record PSDs → {long_out}")
     plot_spectrum(df, long_out,

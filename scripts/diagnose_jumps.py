@@ -23,11 +23,13 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import polars as pl
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 

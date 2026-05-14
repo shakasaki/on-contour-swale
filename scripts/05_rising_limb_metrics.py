@@ -33,6 +33,7 @@ import numpy as np
 import polars as pl
 import seaborn as sns
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 
 # ---------------------------------------------------------------------------
@@ -50,14 +51,15 @@ DEPTHS_TO_ANALYSE = [10, 40]
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 
 EVENTS_CSV   = PLOTS / "00_events_from_soil.csv"
-METRICS_CSV  = PLOTS / "01_rising_limb_metrics.csv"
-METRICS_PNG  = PLOTS / "01_rising_limb_metrics.png"
+METRICS_CSV  = PLOTS / "05_rising_limb_metrics.csv"
+METRICS_PNG  = PLOTS / "05_rising_limb_metrics.png"
 
 
 # ---------------------------------------------------------------------------

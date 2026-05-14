@@ -41,6 +41,7 @@ from matplotlib.colors import LogNorm
 from matplotlib.gridspec import GridSpec
 from mne.time_frequency import tfr_array_morlet
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 from swale.preprocessing import GRID_SECONDS, regular_series
 
@@ -94,8 +95,9 @@ TREATMENT_COLOR = {"swale": "#1f77b4", "control": "#d62728"}
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 TFR_CACHE = CACHE / "tfr"
 PLOTS = ROOT / "plots"
@@ -385,7 +387,7 @@ def main() -> None:
     print(f"  {df.height:,} rows")
 
     for depth in DEPTHS_TO_PLOT:
-        out = PLOTS / f"spectrogram_{depth}cm_{WAVELET}.png"
+        out = PLOTS / f"03_spectrogram_{depth}cm_{WAVELET}.png"
         print(f"Rendering {depth} cm → {out}")
         plot_for_depth(df, depth, out)
     print("Done.")

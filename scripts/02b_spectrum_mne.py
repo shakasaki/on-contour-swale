@@ -23,6 +23,7 @@ import polars as pl
 import seaborn as sns
 from mne.time_frequency import psd_array_welch
 
+from swale.config import load_settings
 from swale.loader import load_swale_dataset
 from swale.preprocessing import (
     GRID_SECONDS,
@@ -53,8 +54,9 @@ MIN_SEGMENT_DAYS = 30  # used only for the empty-panel message
 # ---------------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_ROOT = Path("/home/alexis/DATA/swale")
-METADATA = DATA_ROOT / "Metadata.xlsx"
+SETTINGS = load_settings()
+DATA_ROOT = SETTINGS.data_root
+METADATA = SETTINGS.metadata_xlsx
 CACHE = ROOT / "cache"
 PLOTS = ROOT / "plots"
 
@@ -186,7 +188,7 @@ def main() -> None:
     )
     print(f"  {df.height:,} rows")
 
-    out = PLOTS / "spectrum_mne.png"
+    out = PLOTS / "02b_spectrum_mne.png"
     print(f"Computing MNE Welch PSDs → {out}")
     plot_spectrum(df, out)
     print("Done.")
