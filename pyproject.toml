@@ -16,6 +16,7 @@ dependencies = [
     "seaborn>=0.13",
     "mne>=1.7",
     "pywavelets>=1.5",
+    "pyvista>=0.43",
 ]
 
 [project.optional-dependencies]
