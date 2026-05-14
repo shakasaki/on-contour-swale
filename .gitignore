@@ -14,6 +14,9 @@ cache/
 # Treated as a working directory; canonical inputs live in /home/alexis/DATA/swale.
 data/
 
+# Plot outputs (regenerate via the numbered scripts under scripts/).
+plots/
+
 # Excel lock files (open spreadsheet in LibreOffice creates these).
 .~lock.*#
 
