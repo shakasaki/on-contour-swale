@@ -42,6 +42,7 @@ from matplotlib.gridspec import GridSpec
 from mne.time_frequency import tfr_array_morlet
 
 from swale.config import load_settings
+from swale.display_names import display
 from swale.loader import load_swale_dataset
 from swale.preprocessing import GRID_SECONDS, regular_series
 
@@ -321,7 +322,7 @@ def plot_for_depth(df: pl.DataFrame, depth: int, out: Path) -> None:
         # regardless of figure scaling. set_title at fontsize 10 was getting
         # squashed into the inter-row gap.
         label = (f"{treatment.upper()}  {location} «{tag}»  "
-                 f"({sid}, {depth} cm)")
+                 f"({display(sid)})")
         if power is None:
             ax.text(0.5, 0.5, "no usable segment", ha="center", va="center",
                      transform=ax.transAxes, alpha=0.6)

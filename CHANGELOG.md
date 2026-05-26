@@ -3,6 +3,122 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-05-23 — 2026-05-26 — presentation prep: tau-by-slope, captured-water budget, PET upgrade, transpiration test, sensor display names
+
+### Added
+- `notes/processing_steps.md` — full play-by-play of the pipeline,
+  with a top-section convention table mapping raw `SMSnn` IDs to
+  the new compact display names (`sw_t_10`, `cn_b_40`, etc.).
+- `notes/figures_index.md` — one-paragraph "what/how/why" per
+  figure in `plots/`, grouped by pipeline section.
+- `notes/presentation_slides.md` — 16-slide Marp deck for the
+  presentation: site & hypothesis, coverage caveats (dead rain
+  gauge), recession τ slope-paired (3 figures), τ map, Mid/Mound
+  overlay, 40 cm amplitudes, tree-transpiration test (PET
+  regression), PM-FAO methodology slide, outlook.
+- `src/swale/display_names.py` — central `display(sensor_id)` helper
+  mapping the raw `SMSnn` IDs to the
+  `{sw|cn}_{t|m|b|b1|b2|s}_{10|40}` convention. Raw IDs remain the
+  canonical data key; only figure labels change.
+- `scripts/07c_recession_tau_by_slope.py` — recession τ
+  distributions, slope-paired (Top / Mid / Bottom), common y-axis.
+- `scripts/07d_mid_mound_overlay.py` — VWC time series Mound vs
+  control Mid, both depths, with long-run means annotated.
+- `scripts/07e_event_amplitude_40cm.py` — 40 cm event response
+  in three panels: response rate, ΔVWC distribution, count of
+  big-amplitude events at two thresholds.
+- `scripts/07f_diurnal_dry_season.py` — composite-day diurnal
+  cycle of VWC + soil temperature at Mound vs control Mid, both
+  depths, two dry-season windows. Uses 24-h centered rolling-mean
+  high-pass (not per-calendar-day subtraction, which has a known
+  drift-aliasing bug at fast-drying sensors).
+- `scripts/07g_pet_dvwc_regression.py` — daily PM-FAO PET vs
+  centered first-difference ΔVWC, Mid/Mound + Bottom, both depths,
+  with daily and 7-day rolling means. Identifies SMS07 (`sw_b1_40`)
+  as the unambiguous transpiration signature (β ≈ −0.6, R² = 0.30).
+- `scripts/07h_centered_vs_forward_diff.py` — side-by-side check
+  that centered vs forward first difference gives equivalent β.
+- `scripts/07i_hourly_pet_regression.py` — hourly PM-FAO PET (FAO
+  half-sine disaggregation) vs centered hourly ΔVWC; right column
+  is the composite-day stack of hourly ΔVWC, the most diagnostic
+  view of the transpiration signature.
+- `scripts/07j_captured_water.py` — per-event ΔVWC slope-paired
+  with the column-equivalent mm conversion (10 cm sensor →
+  0.25 m layer, 40 cm sensor → 0.40 m layer); three panels per
+  slope position covering distribution, per-event swale−control
+  diff, and cumulative captured-water bar chart.
+- `scripts/07k_annualized_water_budget.py` — annualises the
+  captured-water totals (94 events / 1.645 yr = 57.1 events/yr)
+  to mm/yr/m² and projects to liters at 10/50/200 m² scenarios.
+  Writes `plots/07k_annual_water_budget.csv` for re-use.
+- `scripts/08b_pet_diurnal_envelope.py` — three-panel PET
+  visualisation: full daily record, representative week of
+  hourly disaggregation, composite-day envelope.
+- `scripts/08c_penman_monteith.py` — full FAO-56 Penman-Monteith
+  ETo implementation with reduced-data assumptions (measured T,
+  P, ea; assumed u₂ = 2 m/s; Rs estimated from Hargreaves
+  Rs formula at K_rs = 0.19 coastal). Outputs `plots/08c_pm_daily.csv`
+  and a comparison figure `plots/08c_hs_vs_pm.png`.
+
+### Changed
+- **PET default is now Penman-Monteith FAO-56**, not Hargreaves-
+  Samani. PM uses our measured air temp, atmospheric pressure,
+  and vapour pressure (since 2024-07-23). HS remains as a legacy
+  fallback for the early record. Documented in
+  `notes/processing_steps.md` §E with full FAO-56 equation
+  references (Allen et al. 1998) and the
+  measured-vs-assumed inputs table.
+- **Sensor labels in figures use the new display names** —
+  `sw_t_10`, `cn_b_40`, etc. Updated scripts: `03_spectrogram.py`,
+  `04_event_response.py`, `07c–07k` (where applicable),
+  `09_sensor_layout.py`, `10_per_location_vwc.py`. Raw `SMSnn`
+  remains the data key; only labels change.
+- `notes/processing_steps.md` §E rewritten with E1 (HS legacy),
+  E2 (PM-FAO default), E3 (hourly disaggregation), plus a full
+  references block.
+
+### Findings (informal, from this session)
+- **Exponential dominates power-law** for recession-tail fits:
+  exp wins 431/470 (92 %) of tails, median R² 0.93 vs 0.79.
+- **Slow-drainage signature concentrates at Bottom 1+2.**
+  Per-sensor median τ (R² ≥ 0.7, τ ∈ [5, 500] h):
+  `sw_b1_40` = 103 h, `sw_b2_40` = 132 h; `cn_b_40` = 54 h.
+- **Mid/Mound is wetter at 10 cm but drier at 40 cm than
+  control mid.** SMS04 (`sw_m_10`) mean VWC 0.393 vs SMS13
+  (`cn_m_10`) 0.363 (+0.030); SMS05 (`sw_m_40`) 0.418 vs
+  SMS14 (`cn_m_40`) 0.444 (−0.026).
+- **Big-event count (ΔVWC > 0.05) at 40 cm:** control 7 events
+  total (3 sensors); swale 17 (5 sensors) → ~2.4× more.
+- **Transpiration signature at SMS07** (`sw_b1_40`): PM-FAO
+  daily β = −0.51, 7-d β = −0.60, R² = 0.30. Control twin
+  SMS16 (`cn_b_40`) sits at β ≈ 0. Robust to the choice of
+  PET method (HS gives β = −0.71, R² = 0.30) and finite-
+  difference scheme (forward vs centered).
+- **Captured-water budget — annualised mm/yr per m² of strip:**
+  - Top: control 791, swale 295 → **−496 mm/yr/m²**
+  - Mid/Mound: control 340, swale 667 → **+328**
+  - Bottom 1: control 567, swale 983 → **+416**
+  - Bottom 2: control 567, swale 887 → **+320**
+  - Downslope sink (Mound + Bot 1 + Bot 2): **+1 064 mm/yr/m²**
+  The swale **redistributes** rather than creates: Top loses
+  what the downslope strips gain. Trees at the Mound and Bottom
+  benefit from concentrated water at the foot of the slope.
+- **Diurnal stacking is dominated by the TEROS-12 T-dielectric
+  artifact** at 40 cm (~0.0005 m³/m³ p2p, both treatments).
+  Cannot resolve transpiration from sensor noise at this depth
+  via diurnal stacking — the PET regression is the right test.
+
+### Known issues
+- Hourly regression (07i) currently only covers Bottom 1; should
+  be extended to Mid/Mound + Top + Bot 2 to see if any other
+  position shows a clean daytime drawdown.
+- Slides (`notes/presentation_slides.md`) still reference some
+  mixed SMSnn/display-name labels in the prose tables; needs a
+  pass.
+- PM-FAO PET uses two assumed inputs (wind = 2 m/s; Rs from
+  Hargreaves). A cup anemometer + pyranometer would replace
+  these with measurements — highest-impact future site upgrade.
+
 ## 2026-05-14 — spatial drill-down: sensor layout, DEM, XYZ scans, canonical frame, per-location plots, hillshade
 
 ### Added

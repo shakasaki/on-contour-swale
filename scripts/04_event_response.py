@@ -34,6 +34,7 @@ import seaborn as sns
 from matplotlib.gridspec import GridSpec
 
 from swale.config import load_settings
+from swale.display_names import display
 from swale.loader import load_swale_dataset
 
 # ---------------------------------------------------------------------------
@@ -190,7 +191,7 @@ def plot_event(df_full: pl.DataFrame, out: Path) -> None:
                      linestyle=ls,
                      linewidth=1.3,
                      alpha=0.85,
-                     label=f"{treatment[:2]}-{tag} ({sid})")
+                     label=f"{display(sid)} ({tag})")
 
         ax.axvline(EVENT_DATE, color="k", linestyle=":",
                     linewidth=0.8, alpha=0.5)

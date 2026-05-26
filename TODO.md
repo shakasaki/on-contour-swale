@@ -1,5 +1,10 @@
 # TODO
 
+## 2026-05-26 — open
+- [ ] **Extend hourly PET regression to more sensor pairs** — `07i_hourly_pet_regression.py` currently covers Bottom 1 only. Run for Mid/Mound, Top, and Bot 2 to see whether any other position shows a clean midday-drawdown signature in the composite-day stack. If only Bot 1 has it, the "trees at the foot of the slope" interpretation tightens.
+- [ ] **Update slide deck to use the display-name convention consistently** — `notes/presentation_slides.md` still has a mix of `SMSnn` and `sw_/cn_` labels in the prose tables. Sweep through and unify.
+- [ ] **Hardware wishlist for PM-FAO PET** — the Penman-Monteith implementation in `08c_penman_monteith.py` assumes `u₂ = 2 m/s` (FAO default) and estimates `Rs` from Hargreaves `K_rs · √ΔT · Ra` because we have no on-site anemometer or pyranometer. A cup anemometer (~$100) is the highest-impact upgrade — would remove the wind assumption. Pyranometer next, for measured `Rs`. Re-run PM-FAO and the SMS07 regression with measurements once installed.
+
 ## 2026-05-14 — open
 
 - [ ] **40 cm drill-down, event-level phase**. Per-location τ map now shows the slow-drainage at swale 40 cm concentrates at Bottom slope 1+2 (SMS07/09), not at the Mound or Step. Next: event-by-event drilldown — compare a handful of large events at SMS07/09 vs SMS05/10 vs control SMS12/14/16 to see which events drive the per-sensor τ spread. Curated subset from `plots/00_events_from_soil.csv`.

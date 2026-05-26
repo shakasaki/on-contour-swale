@@ -95,9 +95,10 @@ def plot_layout(out: Path) -> None:
             )
             ax.add_patch(ell)
 
-        # Text label: SMS IDs + Widmer location + Z
-        ids = ",".join(sid.replace("SMS", "") for sid in p.sensor_ids)
-        label = f"SMS {ids}\n{p.widmer_location}\nZ={p.z:+.2f}"
+        # Text label: display names + Widmer location + Z
+        from swale.display_names import display
+        disp = " · ".join(display(sid) for sid in p.sensor_ids)
+        label = f"{disp}\n{p.widmer_location}\nZ={p.z:+.2f}"
         dx_px, dy_px = LABEL_OFFSETS_PIXELS.get(p.sensor_ids, DEFAULT_LABEL_OFFSET_PIXELS)
         ha = "left" if dx_px >= 0 else "right"
         ax.annotate(
@@ -133,7 +134,7 @@ def plot_layout(out: Path) -> None:
                                 markeredgecolor=control_color, markerfacecolor="lightgrey",
                                 markersize=12, markeredgewidth=2, label="Control")
     unc_proxy = plt.Line2D([0], [0], linestyle="--", color="black",
-                            label=f"{STD_ELLIPSE_NSIGMA}σ uncertainty (SMS 10)")
+                            label=f"{STD_ELLIPSE_NSIGMA}σ uncertainty (sw_s_40)")
     ax.legend(handles=[swale_proxy, control_proxy, unc_proxy],
               loc="upper left", fontsize=10, frameon=True)
 

@@ -116,9 +116,10 @@ def plot_one_depth(df: pl.DataFrame, depth_cm: int, out: Path) -> None:
                     fontsize=9, color="grey", style="italic",
                 )
             else:
+                from swale.display_names import display
                 ax.plot(
                     sub["timestamp"], sub["value"],
-                    color=color, label=sid, **LINE_KW,
+                    color=color, label=display(sid), **LINE_KW,
                 )
 
         # Mark rain-gauge failure for context
@@ -129,9 +130,10 @@ def plot_one_depth(df: pl.DataFrame, depth_cm: int, out: Path) -> None:
             )
 
         # Row label inside the axis on the right (compact)
+        from swale.display_names import display
         ax.text(
             1.005, 0.5,
-            f"{treatment} {location}\n{sid or '-'}",
+            f"{treatment} {location}\n{display(sid) if sid else '-'}",
             transform=ax.transAxes, ha="left", va="center", fontsize=9,
             color=color, weight="bold",
         )
