@@ -1,5 +1,12 @@
 # TODO
 
+## 2026-05-29 — OhmPi resistivity (open)
+- [ ] **Find a moderate-SP-drift quad for the static/dynamic/linear SP writeup** — line E quads are too far gone (railing at ±7500 mV) to illustrate the *rescuable* case. Need a quad where SP ramps smoothly during the measurement but the signal is still recoverable, to demonstrate that a linear-drift SP fit beats both static (constant) and sign-flip when SP isn't constant. Then document which model fits which dataset.
+- [ ] **Set good/bad thresholds on the scatter and build the clean per-survey R table for lines A–D** — apply the sign-flip estimator (`R = mean(V·pol)/mean(I·pol)`) to all surviving quads, cache a per-(survey,quad) R table. Candidate cut from `qc_overview.py`: |vmn| ≳ a few mV AND reciprocal error ≲ 5%. Wenner A–D ≈ keep all; dipdip A–D keep the close/strong quads.
+- [ ] **Build the Bokeh waveform browser** for on-demand quad inspection (dropdown over quads → waveform across all surveys), the scalable alternative to static per-survey plots. Base on `ohmpi/scripts/guillaume_plot_data.py`.
+- [ ] **Blacklist bad survey-days** — vertical red stripes in the dipdip heatmap = whole-survey failures across all quads (battery/rain/connection). Compute per-day pass fraction and drop the bad dates globally.
+- [issue] **Line E central electrodes 51–57 are a hardware fault** — electrode #54 at ~5 kΩ contact (25× normal), quads through the zone rail at ±7500 mV, broken since campaign start. Drop quads touching 51–57; salvage the end quads (e.g. `56_59_57_58`). Physical fix needed on site (likely a damaged central cable section / corroded electrode 54).
+
 ## 2026-05-26 — open
 - [ ] **Extend hourly PET regression to more sensor pairs** — `07i_hourly_pet_regression.py` currently covers Bottom 1 only. Run for Mid/Mound, Top, and Bot 2 to see whether any other position shows a clean midday-drawdown signature in the composite-day stack. If only Bot 1 has it, the "trees at the foot of the slope" interpretation tightens.
 - [ ] **Update slide deck to use the display-name convention consistently** — `notes/presentation_slides.md` still has a mix of `SMSnn` and `sw_/cn_` labels in the prose tables. Sweep through and unify.

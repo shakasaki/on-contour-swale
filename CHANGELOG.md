@@ -3,6 +3,36 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-05-29 — OhmPi resistivity: fast loader, QC triage, test-circuit validation, line E diagnosis
+
+### Added
+- `ohmpi/scripts/ohmpi_loader.py` — polars loading layer for the OhmPi
+  campaign (data at repo-root `data/ohmpi/`, 2496 surveys, 2025-04-08 →
+  2026-01-22). `build_survey_index()` (one row/survey), `build_summary_table()`
+  (concat all instrument `_results.csv` → ~92k survey×quad rows, with
+  reciprocal error from pairing `a_b_m_n` with `m_n_a_b`), `load_waveforms()`
+  (stream `_fw.zip`s, filter to chosen quads, concat across the campaign with a
+  `timestamp` col). Skips one corrupt zip
+  (`2025/20251031/dipdip_line_E_..._fw.zip`). Caches to `ohmpi/cache/`.
+- `ohmpi/scripts/test_circuit.py` — validates the ~100 Ω reference resistor
+  (`60_61_62_64`) over the whole campaign with the sign-flip half-cycle
+  estimator `R = mean(V·pol)/mean(I·pol)`. Daily R holds 99.2/99.8 Ω (fwd/recip)
+  all year. `plot_method_compare()` shows off-pulse subtraction is biased per
+  half-cycle (+cycle 80 Ω / −cycle 119 Ω) while sign-flip is unbiased (99.3 Ω).
+- `ohmpi/scripts/qc_overview.py` — campaign-wide triage from the cheap summary
+  table: `quad × time` reciprocal-error heatmaps (one panel per line) and
+  per-quad signal-vs-reciprocal scatters, for dipdip and wenner. Replaces
+  ~90k per-survey plots with a handful of overview images.
+- `ohmpi/scripts/line_e_drilldown.py` — line E investigation: per-electrode
+  fault map (recip error + contact resistance), SP(t) cycle-midpoint drift
+  diagnostic, SP-slope distribution, raw full waveforms and waveform-over-time.
+- `ohmpi/scripts/explore_waveforms.py` — good/bad/reference quad waveform
+  comparison for dipdip line A (waveform-over-time, histograms, examples).
+
+### Changed
+- `.gitignore` — exclude the two large regenerable OhmPi geometry tables
+  (`combinations_with_K.csv` 44 MB, `electrode_combinations.csv` 18 MB).
+
 ## 2026-05-23 — 2026-05-26 — presentation prep: tau-by-slope, captured-water budget, PET upgrade, transpiration test, sensor display names
 
 ### Added

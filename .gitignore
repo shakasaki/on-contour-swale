@@ -35,6 +35,11 @@ notes/*.fdb_latexmk
 notes/*.synctex.gz
 notes/*.toc
 
+# OhmPi: large regenerable geometric-factor tables (rebuild via
+# ohmpi/ohmpi_geometries/compute_k.py and ohmpi/scripts/find_gradients.py).
+ohmpi/ohmpi_geometries/combinations_with_K.csv
+ohmpi/ohmpi_geometries/electrode_combinations.csv
+
 # Editor / OS
 .vscode/
 .idea/
