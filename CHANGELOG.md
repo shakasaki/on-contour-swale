@@ -3,6 +3,61 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-06-02 — OhmPi R table, geometric factor, coordinate fix, ρ_a animation
+
+### Added
+- `ohmpi/scripts/build_r_table.py` — per-(survey,quad) sign-flip resistance
+  table for lines A–D. Streams all ~2000 A–D `_fw.zip`s, applies
+  `R = Σ(V·pol)/Σ(I·pol)` per quad, attaches reciprocal R, reciprocal error,
+  per-quad QC flag (`keep`: median |vmn|≥1 mV AND recip≤5%), `drop_day` flag,
+  K and `rho_a`. Cached to `ohmpi/cache/r_table.parquet` (74,146 rows).
+  `ohmpi/cache/quad_qc.parquet` (118/296 quads kept). Validated: test-circuit
+  quad 99.3 Ω; sign-flip R matches instrument `r` to 3–4 sig figs; dipdip and
+  wenner agree at ρ_a ≈ 5.6 Ω·m campaign-wide.
+- `ohmpi/scripts/geometry.py` — OhmPi channel→coordinate loader and 3D
+  half-space geometric factor `K = 2π/[(1/r_AM−1/r_BM)−(1/r_AN−1/r_BN)]`.
+  Confirmed: quad a/b/m/n = OhmPi channel numbers (not sequential 1–60 survey
+  numbers). Real coords from `merged_electrode_table.xlsx`. K sign resolves
+  the negative dipdip R: K<0 for co-linear dipdip, so K·R>0 throughout.
+- `ohmpi/scripts/plot_geometry.py` — electrode layout plan view over DEM
+  hillshade + elevation panel per line. Applies 180° rotation (x,y)→(−x,−y)
+  to match canonical frame; negates Z_av for correct height order (B
+  upslope/highest, E downslope).
+- `ohmpi/scripts/animate_rho_a.py` — animated GIF of ρ_a pseudosection per
+  line (A–D), one frame per survey day (~250 frames, 8 fps). Three panels:
+  daily rain (gauge-fault greyed post-2025-06-22), VWC 40 cm for the closest
+  SMS pair, and ρ_a scatter at (along-line position via PCA, pseudo-depth =
+  half AB↔MN separation). Both dipdip (circles) and wenner (triangles) shown.
+  Outputs to `ohmpi/plots/animations/rho_a_line_{A,B,C,D}.gif`.
+- `scripts/12b_dem_overlay_flipped_xy.py` (user) — sweeps all 8 XY
+  transform variants over the DEM to identify the correct registration.
+- `scripts/12d_sensors_over_dem2024.py` (user) — applies the correct 180°
+  rotation, exports `plots/12d_electrode_locations_rot180.csv`,
+  `12d_sensor_locations_rot180.csv`, `12d_dem2024_rot180_raster.xyz`.
+
+### Changed
+- `pyproject.toml` — added `numpy>=1.26`, `pandas>=2.0`, `bokeh>=3.4` (were
+  used directly but only transitive dependencies).
+- `config/settings.json` — `data_root` changed from stale absolute
+  `/home/alexis/DATA/sadhana/swale` to repo-relative `data/unpacked`.
+- `src/swale/config.py` — `data_root` now resolved relative to repo root
+  when not absolute (mirrors existing `metadata_xlsx` handling).
+- `tests/test_loader.py`, `tests/test_metadata.py` — slow smoke tests
+  rewired from stale `/home/alexis/...` paths to `load_settings()` so they
+  actually run against the real in-repo data.
+- `README.md` — updated Setup/Tests sections for conda env (`swale`), in-repo
+  data tree, ~20 s slow-test timing.
+
+### Fixed
+- Electrode coordinate frame: raw X_av/Y_av in `merged_electrode_table.xlsx`
+  require 180° rotation to match the DEM. `plot_geometry.py` and
+  `animate_rho_a.py` now apply this. Also identified Z_av is stored inverted
+  (fix pending in source table); `plot_geometry.py` negates Z for display.
+- `compute_k.py` / `electrode_geometry.csv` identified as wrong for this
+  dataset: sequential 1–60 numbering with 1 m flat grid does not match the
+  real OhmPi channel numbers or surveyed positions. `geometry.py` uses the
+  correct source.
+
 ## 2026-05-29 — OhmPi resistivity: fast loader, QC triage, test-circuit validation, line E diagnosis
 
 ### Added
