@@ -60,7 +60,9 @@ def test_parse_metadata_real_file_smoke():
     the synthetic fixture; it's the only place we lock in the real shape
     (18 non-Forest sensors, 24 ports).
     """
-    real = Path("/home/alexis/DATA/swale/Metadata.xlsx")
+    from swale.config import load_settings
+
+    real = load_settings().metadata_xlsx
     if not real.exists():
         pytest.skip("Real Metadata.xlsx not present in this checkout")
     sensors, ports = parse_metadata(real)

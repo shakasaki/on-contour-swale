@@ -75,15 +75,20 @@ def load_settings(path: Path | None = None) -> Settings:
     data = raw["data"]
     sf = raw.get("spatial_frame", {"raw_x_sign": 1, "raw_y_sign": 1})
 
-    # Resolve metadata_xlsx relative to the repo root if it isn't absolute
-    # — so the project survives directory renames without a config edit.
+    # Resolve data_root and metadata_xlsx relative to the repo root if they
+    # aren't absolute — so the project survives directory renames and runs
+    # against the in-repo data/ tree without a config edit.
     metadata_path = Path(data["metadata_xlsx"])
     if not metadata_path.is_absolute():
         metadata_path = _REPO_ROOT / metadata_path
 
+    data_root = Path(data["data_root"])
+    if not data_root.is_absolute():
+        data_root = _REPO_ROOT / data_root
+
     return Settings(
         equilibration=equilibration,
-        data_root=Path(data["data_root"]),
+        data_root=data_root,
         metadata_xlsx=metadata_path,
         rain_gauge_valid_until=str(data["rain_gauge_valid_until"]),
         treatment_colors=dict(raw.get("treatment_colors", {})),

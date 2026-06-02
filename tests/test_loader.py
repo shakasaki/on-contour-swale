@@ -138,10 +138,13 @@ def test_loader_reindex_inserts_nulls(tmp_path: Path):
 
 @pytest.mark.slow
 def test_loader_real_dataset_smoke():
-    """End-to-end smoke against the user's real /home/alexis/DATA/swale tree."""
-    data_root = Path("/home/alexis/DATA/swale")
-    md = data_root / "Metadata.xlsx"
-    if not md.exists():
+    """End-to-end smoke against the real dataset configured in settings.json."""
+    from swale.config import load_settings
+
+    settings = load_settings()
+    data_root = settings.data_root
+    md = settings.metadata_xlsx
+    if not md.exists() or not data_root.is_dir():
         pytest.skip("Real dataset not present in this checkout")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

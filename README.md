@@ -17,11 +17,12 @@ locations so spatial maps are honest about *where* on the slope each
 finding sits.
 
 The repository is the analysis pipeline plus the writeup, not the raw
-data. The raw 6.6 GB of `.xyz` point-cloud scans and the per-logger
-METER ZL6 CSVs / Excel snapshots live outside the repo (in
-`/home/alexis/DATA/sadhana/swale/` on the author's machine, mirrored
-in the project's external storage); the scripts here load from those
-paths via `config/settings.json`.
+data. The full ~12 GB dataset (per-logger METER ZL6 CSVs, `.xyz`
+point-cloud scans, the DEM, and the OhmPi resistivity campaign) lives
+outside the repo and is unzipped at the repo root so it lands at
+`data/` (gitignored). The scripts load from there via
+`config/settings.json`, whose `data_root` defaults to the repo-relative
+`data/unpacked`.
 
 ## What the pipeline produces
 
@@ -88,38 +89,45 @@ tricks. See `src/swale/spatial_frame.py` for the full convention.
 
 ## Setup
 
+A conda env (the author uses miniforge) with an editable install pulls
+every dependency from `pyproject.toml`:
+
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -e .[dev]
+conda create -y -n swale python=3.12
+conda run -n swale pip install -e ".[dev]"
 ```
 
-Then point `config/settings.json` at the on-disk data directory:
+A plain venv works identically (`python3 -m venv .venv && .venv/bin/pip
+install -e ".[dev]"`).
+
+Unzip the dataset at the repo root so the data lands at `data/`.
+`config/settings.json` already points at the in-repo tree:
 
 ```json
 {
   "data": {
-    "data_root": "/path/to/sadhana/swale",
+    "data_root": "data/unpacked",
     "metadata_xlsx": "data/Metadata.xlsx"
   }
 }
 ```
 
-`data_root` should hold the per-logger CSV / Excel exports
-(`5x/Cleaned data/19570.xlsx`, etc.). `metadata_xlsx` is repo-relative
-if you keep the file under `data/Metadata.xlsx` (gitignored), or
-absolute if it lives elsewhere.
+Both paths are resolved relative to the repo root when not absolute
+(see `src/swale/config.py`). `data_root` holds the per-logger export
+folders (`data/unpacked/05511/`, `/19570/`, `/19574/`); point it at an
+absolute path instead if you keep the data elsewhere.
 
-Run any analysis script with the package on the path:
+The editable install puts `swale` on the path, so scripts run directly:
 
 ```bash
-PYTHONPATH=src .venv/bin/python scripts/11_per_location_tau.py
+conda run -n swale python scripts/11_per_location_tau.py
 ```
 
 ## Tests
 
 ```bash
-PYTHONPATH=src .venv/bin/pytest                    # unit tests, <1s
-PYTHONPATH=src .venv/bin/pytest -m slow            # +real-data smoke (~75s)
+conda run -n swale pytest                  # unit tests, <1s
+conda run -n swale pytest -m slow          # +real-data smoke (~20s)
 ```
 
 The unit suite covers the metadata parser, the readers, the loader's

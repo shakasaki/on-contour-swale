@@ -9,11 +9,14 @@ description = "Time-series loader and analysis for soil-sensor data at Sadhana F
 requires-python = ">=3.10"
 dependencies = [
     "polars>=1.20",
+    "numpy>=1.26",
+    "pandas>=2.0",
     "fastexcel>=0.13",
     "openpyxl>=3.1",
     "scipy>=1.11",
     "matplotlib>=3.8",
     "seaborn>=0.13",
+    "bokeh>=3.4",
     "mne>=1.7",
     "pywavelets>=1.5",
     "pyvista>=0.43",

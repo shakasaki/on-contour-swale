@@ -5,7 +5,7 @@
     "variables": ["moisture", "soil_temp", "bulk_ec"]
   },
   "data": {
-    "data_root": "/home/alexis/DATA/sadhana/swale",
+    "data_root": "data/unpacked",
     "metadata_xlsx": "data/Metadata.xlsx",
     "rain_gauge_valid_until": "2025-06-22"
   },
