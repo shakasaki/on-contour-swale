@@ -22,17 +22,18 @@ topographic correction beyond this analytic K belongs in the inversion mesh.
 The test-circuit channels (60–64, the ~100 Ω reference resistor) are not ground
 electrodes and have no coordinates; quads touching them get K = ρ_a = null.
 
-KNOWN COORDINATE ISSUES (being fixed upstream — corrected coords to be pushed):
-  - The Z sign in merged_electrode_table.xlsx is inverted vs true elevation:
-    negating Z makes line B the highest (upslope) and E the lowest, and line A
-    descend monotonically with electrode number — matching the field. As stored,
-    B reads lowest, which is wrong.
-  - The electrode XY frame is not registered to the DEM; a best-fit alignment
-    (transpose + flip) only reaches ~0.2 m RMS. Proper registration needs
-    surveyed control points.
-Neither affects K or ρ_a: the geometric factor depends only on inter-electrode
-distances, which are invariant under reflection, rotation, and translation. The
-issues matter only for placing results on the DEM map / inversion mesh.
+COORDINATE FRAME NOTES:
+  - XY rotation: the raw X_av/Y_av in merged_electrode_table.xlsx require a
+    180° rotation (x,y)→(−x,−y) to match the DEM and the project canonical
+    frame (+X=East, +Y=North). scripts/12d_sensors_over_dem2024.py applies and
+    exports the corrected coordinates. plot_geometry.py applies the same rotation
+    for display.
+  - Z sign: Z_av is stored inverted — negating gives correct relative height
+    (B upslope/highest, E downslope/lowest, A descending with electrode number).
+    Fix pending in merged_electrode_table.xlsx.
+  - Neither issue affects K or ρ_a: the geometric factor depends only on
+    inter-electrode distances, which are invariant under rotation and reflection.
+    The issues matter only for DEM-map placement and inversion mesh topography.
 """
 
 from __future__ import annotations
