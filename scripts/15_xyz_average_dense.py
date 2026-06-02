@@ -26,8 +26,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pyvista as pv
 
-from swale.spatial_frame import load_canonical_dem_mesh, xyz_rotation_table_default
+from swale.spatial_frame import (
+    load_canonical_dem_mesh,
+    xyz_rotation_table_default,
+)
 from swale.xyz_align import apply_transform, compute_or_load_histogram
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +42,8 @@ CACHE_DIR = ROOT / "cache" / "xyz_histograms"
 OUT_AVG = ROOT / "plots" / "15_xyz_averaged.png"
 OUT_STD = ROOT / "plots" / "15_xyz_stddev_per_bin.png"
 OUT_COMPARE = ROOT / "plots" / "15_xyz_average_vs_single.png"
+OUT_DEM_TXT = ROOT / "data" / "DEM" / "DEM_xyz_average_dense_canonical.txt"
+OUT_DEM_MESH = ROOT / "data" / "DEM" / "Mesh_swale_site_from_xyz_average.vtk"
 
 BINS_XY = (1000, 1000)
 # Net transform to reach the canonical frame (+X=East, +Y=North):
@@ -63,8 +69,103 @@ def get_dem_bbox() -> tuple[float, float, float, float] | None:
     if not DEM_MESH.exists():
         return None
     m = load_canonical_dem_mesh(DEM_MESH)
-    b = m.bounds
-    return b.x_min, b.x_max, b.y_min, b.y_max
+    x_min, x_max, y_min, y_max, _, _ = m.bounds
+    return x_min, x_max, y_min, y_max
+
+
+def crop_to_bbox(
+    image: np.ndarray,
+    extent: tuple[float, float, float, float],
+    bbox: tuple[float, float, float, float],
+) -> tuple[np.ndarray, tuple[float, float, float, float]]:
+    """Crop an imshow-style image to a bounding box, snapping to grid edges."""
+    x0, x1, y0, y1 = extent
+    bx0, bx1, by0, by1 = bbox
+    ny, nx = image.shape
+    dx = (x1 - x0) / nx
+    dy = (y1 - y0) / ny
+
+    bx0_c = max(bx0, x0)
+    bx1_c = min(bx1, x1)
+    by0_c = max(by0, y0)
+    by1_c = min(by1, y1)
+
+    i0 = max(int(np.floor((bx0_c - x0) / dx)), 0)
+    i1 = min(int(np.ceil((bx1_c - x0) / dx)), nx)
+    j0 = max(int(np.floor((by0_c - y0) / dy)), 0)
+    j1 = min(int(np.ceil((by1_c - y0) / dy)), ny)
+
+    if i1 <= i0 or j1 <= j0:
+        raise RuntimeError(
+            f"crop produced empty image: extent={extent} bbox={bbox}"
+        )
+
+    cropped = image[j0:j1, i0:i1]
+    extent_c = (x0 + i0 * dx, x0 + i1 * dx, y0 + j0 * dy, y0 + j1 * dy)
+    return cropped, extent_c
+
+
+def canonical_average_grid(
+    mean_z: np.ndarray,
+    extent: tuple[float, float, float, float],
+    dem_bbox: tuple[float, float, float, float] | None,
+) -> tuple[np.ndarray, tuple[float, float, float, float]]:
+    """Return the averaged grid in canonical orientation, cropped to site bbox."""
+    image, extent_t = apply_transform(mean_z.T, extent, **TRANSFORM)
+    if dem_bbox is not None:
+        image, extent_t = crop_to_bbox(image, extent_t, dem_bbox)
+    return image, extent_t
+
+
+def export_dem_text(
+    image: np.ndarray,
+    extent: tuple[float, float, float, float],
+    out_path: Path,
+) -> int:
+    """Write the canonical averaged DEM grid as XYZ text."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ny, nx = image.shape
+    x0, x1, y0, y1 = extent
+    xs = np.linspace(x0, x1, nx, endpoint=False) + 0.5 * (x1 - x0) / nx
+    ys = np.linspace(y0, y1, ny, endpoint=False) + 0.5 * (y1 - y0) / ny
+    xx, yy = np.meshgrid(xs, ys)
+    mask = np.isfinite(image)
+    xyz = np.column_stack((xx[mask], yy[mask], image[mask]))
+    header = "X Y Z\n# Canonical frame: +X=East, +Y=North, +Z=up"
+    np.savetxt(out_path, xyz, fmt="%.6f", header=header, comments="# ")
+    return int(xyz.shape[0])
+
+
+def export_dem_mesh(
+    image: np.ndarray,
+    extent: tuple[float, float, float, float],
+    out_path: Path,
+) -> tuple[int, int]:
+    """Write the canonical averaged DEM grid as a triangulated VTK mesh."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ny, nx = image.shape
+    x0, x1, y0, y1 = extent
+    xs = np.linspace(x0, x1, nx, endpoint=False) + 0.5 * (x1 - x0) / nx
+    ys = np.linspace(y0, y1, ny, endpoint=False) + 0.5 * (y1 - y0) / ny
+    xx, yy = np.meshgrid(xs, ys)
+
+    grid = pv.StructuredGrid(xx, yy, image)
+    surface = grid.extract_surface().triangulate()
+
+    finite_cells = np.ones(surface.n_cells, dtype=bool)
+    faces = surface.faces.reshape(-1, 4)
+    for cell_idx, (_, a, b, c) in enumerate(faces):
+        if not np.all(np.isfinite(surface.points[[a, b, c], 2])):
+            finite_cells[cell_idx] = False
+    mesh = (
+        surface.extract_cells(np.flatnonzero(finite_cells))
+        .extract_surface()
+        .triangulate()
+    )
+    mesh.save(out_path)
+    return int(mesh.n_points), int(mesh.n_cells)
 
 
 def load_all() -> tuple[list[np.ndarray], list[np.ndarray], tuple]:
@@ -208,6 +309,9 @@ def main() -> None:
 
     print("Computing 5-scan mean-Z grid ...")
     avg_mean, avg_count = combine_average(zsums, counts)
+    canonical_avg, canonical_extent = canonical_average_grid(
+        avg_mean, extent, dem_bbox
+    )
     plot_field(
         avg_mean, extent,
         f"Average of {len(DENSE_FILES)} dense con_sw_and_for_* scans\n"
@@ -217,6 +321,17 @@ def main() -> None:
         "Mean Z per bin (m)", CMAP_Z, OUT_AVG, dem_bbox,
     )
     print(f"  wrote {OUT_AVG.relative_to(ROOT)}")
+
+    print("Exporting averaged DEM artifacts ...")
+    n_xyz = export_dem_text(canonical_avg, canonical_extent, OUT_DEM_TXT)
+    n_pts, n_tri = export_dem_mesh(
+        canonical_avg, canonical_extent, OUT_DEM_MESH
+    )
+    print(f"  wrote {OUT_DEM_TXT.relative_to(ROOT)}  ({n_xyz:,} xyz rows)")
+    print(
+        f"  wrote {OUT_DEM_MESH.relative_to(ROOT)}  "
+        f"({n_pts:,} points, {n_tri:,} triangles)"
+    )
 
     print("Computing per-bin std (5-scan disagreement map) ...")
     std = per_bin_stddev(zsums, counts)

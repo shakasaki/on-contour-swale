@@ -39,7 +39,10 @@ from swale.spatial_frame import load_canonical_dem_mesh
 ROOT = Path(__file__).resolve().parent.parent
 SETTINGS = load_settings()
 
-DEM_MESH = ROOT / "data" / "DEM" / "Mesh_swale_site.vtk"
+AVERAGED_DEM_MESH = (
+    ROOT / "data" / "DEM" / "Mesh_swale_site_from_xyz_average.vtk"
+)
+LEGACY_DEM_MESH = ROOT / "data" / "DEM" / "Mesh_swale_site.vtk"
 LOCATIONS_CSV = ROOT / "data" / "SMS_locations.csv"
 
 OUT_XY = ROOT / "plots" / "12_dem_xy.png"
@@ -69,7 +72,11 @@ CAMERA_3D = [
 
 def load_mesh() -> pv.PolyData:
     """Load the site mesh in the canonical frame (+X=East, +Y=North)."""
-    return load_canonical_dem_mesh(DEM_MESH)
+    if AVERAGED_DEM_MESH.exists():
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return pv.read(AVERAGED_DEM_MESH)
+    return load_canonical_dem_mesh(LEGACY_DEM_MESH)
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +257,10 @@ def plot_3d(mesh: pv.PolyData, out: Path) -> None:
 
 def main() -> None:
     OUT_XY.parent.mkdir(exist_ok=True)
-    print(f"Loading {DEM_MESH.relative_to(ROOT)} ...")
+    mesh_path = (
+        AVERAGED_DEM_MESH if AVERAGED_DEM_MESH.exists() else LEGACY_DEM_MESH
+    )
+    print(f"Loading {mesh_path.relative_to(ROOT)} ...")
     mesh = load_mesh()
     print(f"  {mesh.n_points:,} points / {mesh.n_cells:,} triangles")
     print(f"  bounds X[{mesh.bounds[0]:+.1f} {mesh.bounds[1]:+.1f}]  "

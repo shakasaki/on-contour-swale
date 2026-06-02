@@ -43,6 +43,7 @@ Run order is the filename prefix:
 | `10_per_location_vwc.py` | VWC time series, one panel per sensor along the slope, one figure per depth. |
 | `11_per_location_tau.py` | Per-sensor median recession τ on a hillshaded plan-view map. |
 | `12_dem_views.py` | DEM 2-D (`tripcolor` + contours) and 3-D (PyVista oblique). |
+| `12d_sensors_over_dem2024.py` | `DEM_2024_07_25` overlay diagnostic in the raw survey frame, rotated 180° for display/export; writes a rotated plot plus rotated DEM/sensor/electrode exports to `plots/`. |
 | `13_xyz_inventory.py` | Streaming inventory of the raw `.xyz` LiDAR scans. |
 | `14_xyz_aligned.py` | Per-scan aligned plan views after the rotation table. |
 | `15_xyz_average_dense.py` | 5-scan averaged surface model (~1 mm per-bin std). |
@@ -86,6 +87,18 @@ to canonical) are set in `config/settings.json:spatial_frame`. Loaders
 the default XYZ rotation) apply the transform once at load time, so
 every downstream plot draws natively without `ax.invert_*axis()`
 tricks. See `src/swale/spatial_frame.py` for the full convention.
+
+For this repository state, that canonical transform is a 180-degree
+rotation implemented as `raw_x_sign = -1` and `raw_y_sign = -1`. The
+new `12d_sensors_over_dem2024.py` diagnostic does not change the
+project-wide setting; instead it starts from the original
+`data/DEM/DEM_2024_07_25.txt` survey frame and writes a rotated bundle
+to `plots/`:
+
+- `12d_sensors_over_dem2024_rot180.png`
+- `12d_dem2024_rot180_raster.xyz`
+- `12d_sensor_locations_rot180.csv`
+- `12d_electrode_locations_rot180.csv`
 
 ## Setup
 
