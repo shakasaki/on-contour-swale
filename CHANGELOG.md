@@ -3,6 +3,33 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-06-04 — OhmPi cache rebuild tooling + Wenner ρ_a time series vs VWC
+
+### Added
+- `ohmpi/scripts/build_all.py` — one-shot cache builder. Runs `build_r_table.py`
+  then `build_waveform_cache.py`, skipping any cache already present (`--force`
+  to rebuild). Fixes the blank-screen `bokeh serve` on a fresh checkout, where
+  the gitignored `ohmpi/cache/` (r_table + 920 MB waveform set) is absent and
+  `ohmpi_browser.py` dies at module load with
+  `FileNotFoundError: r_table.parquet`.
+- `ohmpi/README.md` — documents the gitignored-cache gotcha, `build_all.py`, the
+  cache table, and how to run the Bokeh browser.
+- `ohmpi/scripts/plot_wenner_timeseries.py` — weekly violin distribution of
+  Wenner apparent resistivity per line A–D over the campaign (kept earth quads,
+  shared 2–12 Ω·m axis), with each line's nearest 40 cm VWC on the top panel.
+  Output `ohmpi/plots/wenner_rho_timeseries.png`.
+- `ohmpi/scripts/plot_wenner_daily.py` — daily median ρ_a + inter-quartile band
+  per line (245 days, 12–21 kept quads/line/day) with the line's nearest 40 cm
+  VWC on a twin axis. Shows the inverse ρ_a–VWC coupling (ρ_a steps up at the
+  August VWC minimum). Output `ohmpi/plots/wenner_rho_daily.png`.
+
+### Changed
+- Line→VWC sensor pairing resolved spatially (nearest 40 cm station per line
+  from electrode↔sensor coords in the shared rot180 frame): A=SMS05 Mound,
+  B=SMS02 Top, C=SMS10 Step, D=SMS05 Mound. Confirms the existing
+  `animate_rho_a.py` hardcode was spatially consistent (A & D both nearest the
+  Mound station, not a copy-paste error).
+
 ## 2026-06-02 — OhmPi R table, geometric factor, coordinate fix, ρ_a animation
 
 ### Added
