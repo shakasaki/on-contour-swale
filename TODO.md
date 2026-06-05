@@ -1,5 +1,23 @@
 # TODO
 
+## 2026-06-05 — ERT inversion + scan-DEM registration
+- [issue] **Electrode elevations still fishy** — electrodes were installed *before*
+  the mound was built, so they must NOT follow the mound topography. The 24.05.30
+  scan DEM postdates the mound; sampling it at electrode XY imposes the mound on
+  electrodes that predate it. DEM itself is fine. Likely fix: take electrode Z
+  from **Widmer's pre-mound survey**, not `scan_dem.elevation`.
+  `resipy_invert.build_profile` currently uses the scan (provisional, flagged
+  with an inline TODO).
+- [ ] **Switch electrode Z to Widmer coordinates**, then re-run the 8 inversions
+  (4 lines × individual/timelapse).
+- [ ] **Nudge one SMS sensor** — slightly off in the 2-pt registration overlay.
+- [ ] **3-D registration refine** — current scan↔world transform is a 2-pt 2-D
+  similarity (horizontal only); a CloudCompare/ICP 3-D align would fix tilt.
+- [ ] **Isolate ResIPy in its own conda env** — it pinned numpy<2 (downgraded
+  `swale` 2.4.6→1.26.4) and pyarrow went missing.
+- [ ] **Wire a private remote for `.wiki/`** and register it as a submodule
+  (currently a local-only repo).
+
 ## 2026-06-04 — OhmPi resistivity time series + VWC coupling
 - [x] **Rebuild caches on this machine** (`ohmpi/scripts/build_all.py`, new) — caches are gitignored (920 MB waveform set), so a fresh checkout has none and `ohmpi_browser.py` blanks with `FileNotFoundError: r_table.parquet`. `build_all.py` runs `build_r_table.py` + `build_waveform_cache.py`, skips existing, `--force` to rebuild. Documented in new `ohmpi/README.md`. Rebuilt: r_table 74,146 rows (test-circuit 99.30 Ω); waveforms 370 files / 920.5 MB (1 bad zip).
 - [x] **Wenner ρ_a time series, weekly violins per line + driver** (`ohmpi/scripts/plot_wenner_timeseries.py`, new → `ohmpi/plots/wenner_rho_timeseries.png`) — 41 weekly violins/line A–D, kept earth quads, shared y 2–12 Ω·m; top panel = nearest 40 cm VWC per line. Rain gauge died 2025-06-22 so precip only covers first ~10 wk → swapped to VWC (full campaign).

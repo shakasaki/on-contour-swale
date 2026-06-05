@@ -59,6 +59,7 @@ import matplotlib.ticker as mticker  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
 REPO = Path(__file__).resolve().parents[2]
 
+import scan_dem  # noqa: E402  (registered 24.05.30 scan DEM for elevation)
 from geometry import load_electrode_coords  # noqa: E402
 from swale.config import load_settings  # noqa: E402
 from swale.loader import load_swale_dataset  # noqa: E402
@@ -109,7 +110,14 @@ def build_profile(line: str, coords: dict[int, tuple[float, float, float]]):
     order = np.argsort(along)
     chans = [chans[i] for i in order]
     along = along[order] - along[order].min()
-    elev = -P[order, 2]                       # negate Z → true height
+    # elevation from the registered 24.05.30 scan DEM (canonical world = -X_raw,
+    # -Y_raw); see scan_dem.py. Replaces the wrong -Z_av convention.
+    # TODO(2026-06-05): electrodes were installed BEFORE the mound was built, so
+    # they should not follow the mound topography. Revisit — electrode Z likely
+    # comes from Widmer's pre-mound survey, not from this (later) scan.
+    xw = -P[order, 0]
+    yw = -P[order, 1]
+    elev = scan_dem.elevation(xw, yw)
     elec = np.zeros((len(chans), 3))
     elec[:, 0] = along
     elec[:, 2] = elev

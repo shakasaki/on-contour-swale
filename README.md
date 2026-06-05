@@ -100,6 +100,25 @@ to `plots/`:
 - `12d_sensor_locations_rot180.csv`
 - `12d_electrode_locations_rot180.csv`
 
+### Canonical surface model for ERT (2026-06-05)
+
+For electrode/sensor **elevation**, the project uses the **24.05.30 terrestrial
+scan** (`data/DEM_xyz/24.05.30_-_con_sw_and_for_11_59_00.xyz`), **not**
+`DEM_2024_07_25` and **not** the per-electrode `Z_av`. The earlier "negate
+`Z_av`" convention was wrong: against the measured surface the raw `Z_av` is
+already up-positive (control high, swale low, in both the survey and the LiDAR),
+and `Z_av` carries survey spikes (e.g. line-A electrode 3). Always obtain
+topography through `ohmpi/scripts/scan_dem.py`:
+
+- `scan_dem.world_to_scan(x, y)` maps survey canonical coords onto the scan
+  (2-D similarity, **no reflection**, scale 1.0157, rotation −21.86°, fitted from
+  the two soil-profile pits visible as square depressions in the scan).
+- `scan_dem.elevation(x, y)` returns the scan-derived elevation; cached height
+  grid at `ohmpi/cache/scan_dem_grid.npz`.
+
+This registration must be applied in all future ERT processing. (One SMS sensor
+still needs a small manual nudge; a full 3-D ICP refine is a later upgrade.)
+
 ## Setup
 
 A conda env (the author uses miniforge) with an editable install pulls

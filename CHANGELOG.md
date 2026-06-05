@@ -3,6 +3,36 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-06-05 — ResIPy time-lapse ERT inversion + scan-DEM registration
+
+### Added
+- `ohmpi/scripts/resipy_invert.py` — 2-D time-lapse ERT inversion of lines A–D
+  with ResIPy 3.6.6 / R2 (via wine). Builds per-line profiles from surveyed
+  electrode positions (SVD principal-axis projection), writes ProtocolDC files of
+  sign-flip transfer resistance, and inverts in two schemes: `individual`
+  (per-survey, `reg_mode 0`) and `timelapse` (background-constrained,
+  `reg_mode 1`, first survey = reference). Renders 3-row frames (VWC 10 cm /
+  40 cm / inverted section) + per-line GIFs under `ohmpi/outputs/inversion/`.
+  Workarounds: monkeypatch `Survey.computeReciprocalC = computeReciprocalP`
+  (cython read-only crash under numpy 1.26), explicit mesh `fmd=3.0`, electrodes
+  set after survey import, serial inversion (parallel wine races on `R2.out`).
+- `ohmpi/scripts/scan_dem.py` — canonical surface model. Uses the **24.05.30
+  terrestrial scan** as the DEM and registers survey coords onto it with a 2-D
+  similarity (no reflection, scale 1.0157, rotation −21.86°) fitted from the two
+  soil-profile pits. `world_to_scan()`, `elevation()`, cached height grid
+  `ohmpi/cache/scan_dem_grid.npz`.
+- `ohmpi/scripts/diag_dem_elevation_check.py`, `diag_line_profiles.py`,
+  `scan_line_transects.py` — diagnostics that established the topography sign was
+  inverted (`-Z_av` anti-correlates with the LiDAR; raw `Z_av` is up-positive)
+  and that line-A electrode 3 had a bad survey Z spike.
+
+### Changed
+- `resipy_invert.py:build_profile` now sources elevation from `scan_dem.elevation`
+  instead of `-Z_av`. **Provisional** — see TODO: electrodes predate the mound,
+  so their Z likely comes from Widmer's pre-mound survey, not the later scan.
+- `README.md` — new "Canonical surface model for ERT" section documenting the
+  scan-DEM choice and the registration transform.
+
 ## 2026-06-04 — OhmPi cache rebuild tooling + Wenner ρ_a time series vs VWC
 
 ### Added
