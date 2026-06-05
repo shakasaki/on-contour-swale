@@ -40,10 +40,9 @@ notes/*.toc
 ohmpi/ohmpi_geometries/combinations_with_K.csv
 ohmpi/ohmpi_geometries/electrode_combinations.csv
 
-# OhmPi: ResIPy inversion outputs + R2 working files (regenerate via
-# ohmpi/scripts/resipy_invert.py).
-ohmpi/outputs/inversion/
-ohmpi/outputs/resipy_work/
+# OhmPi: all generated outputs (ResIPy inversion GIFs/PNGs, R2 working files,
+# measurement-statistics CSVs). Regenerate via the ohmpi/scripts/.
+ohmpi/outputs/
 
 # Editor / OS
 .vscode/
