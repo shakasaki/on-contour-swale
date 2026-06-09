@@ -1,15 +1,22 @@
 # TODO
 
+## 2026-06-09 — electrode-Z decision + inversion rerun
+- [x] **Electrode Z source decided: 24.05.30 scan DEM** (Alexis) — sample electrode
+  Z from the DEM via `scan_dem.elevation`; the temporal mismatch isn't worth
+  chasing for 2-D. Visual checks: `diag_elec_z_vs_dem.py` (planview) +
+  `scan_line_transects.py` (per-line). Per-line Z_av offsets (B ~−0.6, E ~+0.4 m)
+  treated as registration noise.
+- [x] **DEM low-pass** — `scan_dem` now Gaussian-smooths (σ≈15 cm) + bilinear
+  samples; was jagged nearest-bin. `diag_elec_z_vs_dem.py` / `scan_lowpass_compare.png`.
+- [x] **Per-line inversion topography** — A: mound electrode (ch 6) interpolated
+  between ch 5/7 (−16 cm); C/D: straight-line fit (5/8 cm span, negligible);
+  B: smoothed DEM. Wired in `build_profile`.
+- [x] **Timelapse output = HTML scrubber** (slider + ←/→) instead of GIF — GIF
+  can't seek. individual mode still GIF. (no ffmpeg → no MP4 for now.)
+- [x] **Re-ran 8 inversions** (A–D × individual/timelapse) → `ohmpi/outputs/inversion/`,
+  log `rerun_2026-06-09.log`.
+
 ## 2026-06-05 — ERT inversion + scan-DEM registration
-- [issue] **Electrode elevations still fishy** — electrodes were installed *before*
-  the mound was built, so they must NOT follow the mound topography. The 24.05.30
-  scan DEM postdates the mound; sampling it at electrode XY imposes the mound on
-  electrodes that predate it. DEM itself is fine. Likely fix: take electrode Z
-  from **Widmer's pre-mound survey**, not `scan_dem.elevation`.
-  `resipy_invert.build_profile` currently uses the scan (provisional, flagged
-  with an inline TODO).
-- [ ] **Switch electrode Z to Widmer coordinates**, then re-run the 8 inversions
-  (4 lines × individual/timelapse).
 - [ ] **Nudge one SMS sensor** — slightly off in the 2-pt registration overlay.
 - [ ] **3-D registration refine** — current scan↔world transform is a 2-pt 2-D
   similarity (horizontal only); a CloudCompare/ICP 3-D align would fix tilt.

@@ -49,6 +49,11 @@ ANGLE_DEG = float(np.degrees(np.angle(_FAC)))
 _EXT = (-8.0, 24.0, -16.0, 12.0)   # Xo_min, Xo_max, Yo_min, Yo_max
 _BIN = 0.05                         # 5 cm
 
+# low-pass: the raw 5 cm bin grid is noisy (scan speckle, vegetation). Smooth it
+# with a NaN-aware Gaussian before sampling; sampling itself is bilinear. Set
+# SMOOTH_SIGMA_BINS = 0 to disable smoothing (pure bilinear on the raw grid).
+SMOOTH_SIGMA_BINS = 3.0             # 3 bins ≈ 15 cm
+
 
 def world_to_scan(x, y):
     """Map canonical world (x, y) -> scan oriented (Xo, Yo). Arrays or scalars."""
@@ -83,34 +88,53 @@ def build_grid(force: bool = False) -> None:
           f"{int(hcnt.sum()):,} pts binned)")
 
 
+def _nan_gaussian(grid, sigma):
+    """NaN-aware Gaussian low-pass: smooth values and the valid-mask separately,
+    then divide, so holes don't bleed zeros into the surface."""
+    from scipy.ndimage import gaussian_filter
+    mask = np.isfinite(grid)
+    vals = np.where(mask, grid, 0.0)
+    num = gaussian_filter(vals, sigma, mode="nearest")
+    den = gaussian_filter(mask.astype(float), sigma, mode="nearest")
+    out = np.where(den > 1e-6, num / np.maximum(den, 1e-6), np.nan)
+    return out
+
+
 _GRID = None
 
 
 def _load_grid():
+    """Return (smoothed grid, ext, binsize). Grid is NaN-filled (neighbourhood
+    median) then optionally Gaussian-smoothed per SMOOTH_SIGMA_BINS."""
     global _GRID
     if _GRID is None:
         build_grid()
         d = np.load(CACHE)
-        _GRID = (d["grid"], tuple(d["ext"]), float(d["binsize"]))
+        grid = d["grid"]
+        # NaN-aware Gaussian both low-passes the surface and fills holes within
+        # ~sigma reach (so bilinear sampling sees no NaNs in the instrumented area)
+        if SMOOTH_SIGMA_BINS > 0:
+            grid = _nan_gaussian(grid, SMOOTH_SIGMA_BINS)
+        _GRID = (grid, tuple(d["ext"]), float(d["binsize"]))
     return _GRID
 
 
 def sample_height(Xo, Yo):
-    """Nearest-bin scan height at oriented coords (NaN-filled holes interpolated
-    by a small neighbourhood median)."""
+    """Bilinear scan height at oriented coords, on the smoothed grid."""
     grid, (x0, x1, y0, y1), b = _load_grid()
     nx, ny = grid.shape
     Xo = np.atleast_1d(Xo).astype(float)
     Yo = np.atleast_1d(Yo).astype(float)
-    ix = np.clip(((Xo - x0) / b).astype(int), 0, nx - 1)
-    iy = np.clip(((Yo - y0) / b).astype(int), 0, ny - 1)
-    out = grid[ix, iy]
-    # fill any NaN from a 7x7 neighbourhood median
-    for k in np.where(np.isnan(out))[0]:
-        i, j = ix[k], iy[k]
-        w = grid[max(0, i - 3):i + 4, max(0, j - 3):j + 4]
-        if np.isfinite(w).any():
-            out[k] = np.nanmedian(w)
+    # continuous cell-centre coords: bin centre i sits at x0 + (i+0.5)*b
+    fx = np.clip((Xo - x0) / b - 0.5, 0, nx - 1)
+    fy = np.clip((Yo - y0) / b - 0.5, 0, ny - 1)
+    i0 = np.floor(fx).astype(int); i1 = np.minimum(i0 + 1, nx - 1)
+    j0 = np.floor(fy).astype(int); j1 = np.minimum(j0 + 1, ny - 1)
+    wx = fx - i0; wy = fy - j0
+    out = ((1 - wx) * (1 - wy) * grid[i0, j0]
+           + wx * (1 - wy) * grid[i1, j0]
+           + (1 - wx) * wy * grid[i0, j1]
+           + wx * wy * grid[i1, j1])
     return out
 
 

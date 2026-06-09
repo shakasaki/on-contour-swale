@@ -3,6 +3,27 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-06-09 — Inversion topography finalized + scrubbable time-lapse output
+
+### Added
+- `ohmpi/scripts/diag_elec_z_vs_dem.py` — planview check: electrodes coloured by
+  surveyed `Z_av` on the same colormap as the 24.05.30 scan DEM (datum-matched),
+  with per-line residual summary. Exposed that lines sit at different vertical
+  offsets (B ~−0.6 m, E ~+0.4 m), which is why pooled `corr(Z_av, DEM)` is
+  negative while per-line correlation is +0.8..1.0.
+- Self-contained HTML scrubber for time-lapse output (`line_<L>_timelapse.html`):
+  frame slider, ←/→ stepping, play/pause — replaces the non-seekable GIF.
+
+### Changed
+- `scan_dem.py` — sampling is now **bilinear on a NaN-aware Gaussian low-pass**
+  of the height grid (`SMOOTH_SIGMA_BINS=3` ≈ 15 cm), replacing nearest-5-cm-bin
+  lookup. Removes the jagged surface that made electrodes appear off the profile.
+- `resipy_invert.build_profile` — per-line inversion topography (decided with
+  Alexis): **A** drops the mound electrode (channel 6) to the line interpolated
+  between channels 5↔7 (electrodes predate the mound); **C/D** use a straight-line
+  fit (5/8 cm span, negligible); **B** keeps the smoothed DEM.
+- Re-ran all 8 inversions (A–D × individual/timelapse) with this topography.
+
 ## 2026-06-05 — ResIPy time-lapse ERT inversion + scan-DEM registration
 
 ### Added

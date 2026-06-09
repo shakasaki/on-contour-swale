@@ -4,8 +4,8 @@ For each electrode line (A–D) this script:
 
   1. builds a 2D profile from the surveyed electrode positions — electrodes are
      projected onto the line's principal horizontal axis (along-line distance)
-     and given their true elevation (negated Z, per the coordinate-frame note in
-     geometry.py). R2 then computes the geometric factor *numerically* from this
+     and given their elevation from the registered 24.05.30 scan DEM (see
+     scan_dem.py). R2 then computes the geometric factor *numerically* from this
      mesh, which is the whole point of inverting rather than using analytic K.
   2. writes one ProtocolDC file per daily survey: local 1-based electrode indices
      a b m n and the transfer resistance R (sign-flip estimator, the canonical
@@ -34,6 +34,7 @@ Run from the repo root inside the `swale` conda env, e.g.::
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
 import warnings
@@ -92,7 +93,8 @@ def build_profile(line: str, coords: dict[int, tuple[float, float, float]]):
     """Return (channels, elec Nx3 array, channel→local-index map) for `line`.
 
     Electrodes are ordered along the line's principal horizontal axis; column 0
-    is along-line distance (m, starting at 0), column 2 is elevation (−Z).
+    is along-line distance (m, starting at 0), column 2 is elevation from the
+    24.05.30 scan DEM.
     """
     r = pl.read_parquet(R_TABLE)
     d = r.filter((pl.col("line") == line) & (pl.col("array") == ARRAY) & pl.col("keep"))
@@ -112,12 +114,23 @@ def build_profile(line: str, coords: dict[int, tuple[float, float, float]]):
     along = along[order] - along[order].min()
     # elevation from the registered 24.05.30 scan DEM (canonical world = -X_raw,
     # -Y_raw); see scan_dem.py. Replaces the wrong -Z_av convention.
-    # TODO(2026-06-05): electrodes were installed BEFORE the mound was built, so
-    # they should not follow the mound topography. Revisit — electrode Z likely
-    # comes from Widmer's pre-mound survey, not from this (later) scan.
+    # DECIDED 2026-06-09 (Alexis): keep the scan DEM as the electrode-Z source.
+    # The per-line B/E offsets vs surveyed Z_av (diag_elec_z_vs_dem.py) are taken
+    # as registration/survey noise, not a reason to switch to a pre-mound survey.
     xw = -P[order, 0]
     yw = -P[order, 1]
     elev = scan_dem.elevation(xw, yw)
+    # per-line topography treatment (2026-06-09, Alexis):
+    #   A: pre-mound electrodes — the scan's mound bump sits on channel 6; drop it
+    #      to the line interpolated between its neighbours (ch 5 ↔ ch 7).
+    #   C, D: elevation span is ~5–8 cm (negligible for 2-D); use a straight line.
+    #   B: keep the scan DEM as-is.
+    if line == "A" and {5, 6, 7} <= set(chans):
+        i5, i6, i7 = (chans.index(c) for c in (5, 6, 7))
+        elev[i6] = np.interp(along[i6], [along[i5], along[i7]],
+                             [elev[i5], elev[i7]])
+    elif line in ("C", "D"):
+        elev = np.polyval(np.polyfit(along, elev, 1), along)
     elec = np.zeros((len(chans), 3))
     elec[:, 0] = along
     elec[:, 2] = elev
@@ -281,7 +294,11 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
         paths.append(p)
     plt.close(fig)
 
-    # assemble GIF straight from the saved frames (avoids a second redraw pass)
+    # timelapse: scrubbable HTML (slider + ← → step, the GIF can't seek).
+    # individual: a GIF quick-look is fine (surveys are independent).
+    if mode == "timelapse":
+        return write_scrubber(outdir, line, mode, paths, frame_dates)
+
     from PIL import Image
 
     imgs = [Image.open(p).convert("P", palette=Image.ADAPTIVE) for p in paths]
@@ -290,6 +307,50 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
                  duration=int(1000 / FPS), loop=0)
     print(f"  saved {gif.relative_to(REPO)}  ({n} frames)")
     return gif
+
+
+def write_scrubber(outdir: Path, line, mode, paths, frame_dates):
+    """Self-contained HTML viewer over the saved frames: slider, prev/next
+    buttons, ← → arrow keys, play/pause. Needs no codec or server."""
+    rels = [str(p.relative_to(outdir)) for p in paths]
+    dates = [str(d) for d in frame_dates[:len(paths)]]
+    html = """<!doctype html><meta charset=utf-8>
+<title>Line {line} {mode}</title>
+<style>body{{font-family:sans-serif;margin:0;background:#111;color:#eee}}
+#bar{{padding:8px;display:flex;gap:10px;align-items:center}}
+img{{display:block;max-width:100%;margin:auto}}
+input[type=range]{{flex:1}} button{{font-size:16px;padding:2px 10px}}</style>
+<div id=bar>
+ <button onclick=step(-1)>◀</button>
+ <button id=play onclick=toggle()>▶</button>
+ <button onclick=step(1)>▶▶</button>
+ <input id=s type=range min=0 max={last} value=0 oninput=show(this.value)>
+ <span id=lbl></span>
+</div>
+<img id=im>
+<script>
+const F={frames}, D={dates};
+let i=0, t=null;
+const im=document.getElementById('im'), s=document.getElementById('s'),
+      lbl=document.getElementById('lbl');
+function show(k){{i=+k;im.src=F[i];s.value=i;
+  lbl.textContent=(i+1)+'/'+F.length+'  '+D[i];}}
+function step(d){{show((i+d+F.length)%F.length);}}
+function toggle(){{const b=document.getElementById('play');
+  if(t){{clearInterval(t);t=null;b.textContent='▶';}}
+  else{{t=setInterval(()=>step(1),{ms});b.textContent='⏸';}}}}
+document.onkeydown=e=>{{if(e.key=='ArrowRight')step(1);
+  else if(e.key=='ArrowLeft')step(-1);
+  else if(e.key==' '){{e.preventDefault();toggle();}}}};
+show(0);
+</script>
+""".format(line=line, mode=mode, last=len(paths) - 1,
+           frames=json.dumps(rels), dates=json.dumps(dates),
+           ms=int(1000 / FPS))
+    out = outdir / f"line_{line}_{mode}.html"
+    out.write_text(html)
+    print(f"  saved {out.relative_to(REPO)}  ({len(paths)} frames, scrubbable)")
+    return out
 
 
 # ── driver ───────────────────────────────────────────────────────────────────
