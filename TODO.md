@@ -9,6 +9,7 @@
 - [x] **MP4 output** — `write_mp4` (imageio-ffmpeg) replaces the broken HTML scrubber.
 - [ ] **Bad-survey-day spikes** — RMS>2 spikes in convergence = whole-survey
   failures; ties into the global day-blacklist TODO.
+- [ ] **NEXT SESSION: soil-moisture data** — revisit the VWC data (Alexis, next focus).
 
 ## 2026-06-09 — electrode-Z decision + inversion rerun
 - [x] **Electrode Z source decided: 24.05.30 scan DEM** (Alexis) — sample electrode
