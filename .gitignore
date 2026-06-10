@@ -48,3 +48,6 @@ ohmpi/outputs/
 .vscode/
 .idea/
 .DS_Store
+
+# wiki folder
+.wiki
