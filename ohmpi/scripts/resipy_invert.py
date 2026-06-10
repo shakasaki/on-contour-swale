@@ -34,7 +34,6 @@ Run from the repo root inside the `swale` conda env, e.g.::
 from __future__ import annotations
 
 import argparse
-import json
 import shutil
 import sys
 import warnings
@@ -85,6 +84,7 @@ LINE_SMS: dict[str, list[str]] = {
 FPS = 6
 DPI = 100
 FIGSIZE = (12, 9)
+ERR_FLOOR_PCT = 1.0   # floor on per-datum reciprocal error [%] fed to R2
 
 
 # ── geometry ─────────────────────────────────────────────────────────────────
@@ -157,8 +157,14 @@ def write_protocols(line: str, ch2idx: dict[int, int], outdir: Path, every: int)
     for i, ts in enumerate(timestamps):
         s = d.filter(pl.col("timestamp") == ts)
         rows = [
-            (ch2idx[a], ch2idx[b], ch2idx[m], ch2idx[n], R)
-            for a, b, m, n, R in zip(s["a"], s["b"], s["m"], s["n"], s["R"])
+            # 7th column = resistance error [Ω] from the measured reciprocal:
+            # |R|·recip_err_pct/100, floored at ERR_FLOOR_PCT so a near-zero
+            # reciprocal error can't get infinite weight. R2 reads this as the
+            # per-datum data error ("DC 2D + err" protocol) when k.err=True.
+            (ch2idx[a], ch2idx[b], ch2idx[m], ch2idx[n], R,
+             abs(R) * max(e if e is not None else ERR_FLOOR_PCT, ERR_FLOOR_PCT) / 100)
+            for a, b, m, n, R, e in zip(
+                s["a"], s["b"], s["m"], s["n"], s["R"], s["recip_err_pct"])
             if all(x in ch2idx for x in (a, b, m, n))
         ]
         if len(rows) < 6:        # too few measurements to invert meaningfully
@@ -166,8 +172,8 @@ def write_protocols(line: str, ch2idx: dict[int, int], outdir: Path, every: int)
         path = outdir / f"protocol_{i:03d}.dat"
         with open(path, "w") as f:
             f.write(f"{len(rows)}\n")
-            for j, (a, b, m, n, R) in enumerate(rows, 1):
-                f.write(f"{j} {a} {b} {m} {n} {R:.6f}\n")
+            for j, (a, b, m, n, R, err) in enumerate(rows, 1):
+                f.write(f"{j} {a} {b} {m} {n} {R:.6f} {err:.6f}\n")
         written.append((ts.date(), path))
     return written
 
@@ -216,27 +222,44 @@ def run_inversion(line: str, mode: str, elec, protodir: Path, workdir: Path):
         k.createTimeLapseSurvey(str(protodir), ftype="ProtocolDC")
         k.param["reg_mode"] = 1          # background-constrained (first = ref)
     k.setElec(elec)                       # set AFTER import (import resets elec)
+    k.err = True              # use the per-datum reciprocal errors from protocol
     # fmd (fine-mesh depth) must be given explicitly: the auto value collapses to
     # 0 on these short topographic profiles and gmsh then yields an empty mesh.
     k.createMesh(typ="trian", fmd=3.0)
     k.invert(parallel=False)   # parallel wine runs race on R2.out; keep serial
+    if mode == "timelapse":
+        k.postProcTl()         # adds difference(percent) vs the reference survey
     return k
 
 
 # ── rendering ────────────────────────────────────────────────────────────────
 
-def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
-    """3-row animation: VWC 10 cm, VWC 40 cm, inverted section. Returns gif path."""
+def render_gif(line, mode, k, frame_dates, vwc, outdir: Path, rms_by_i=None):
+    """Animation rows: VWC 10 cm, VWC 40 cm, inverted resistivity, and — for
+    timelapse — an appended difference(%) panel vs the reference survey.
+    `rms_by_i` maps frame index → final RMS misfit (shown in the section title)."""
     n = len(k.meshResults)
     if n == 0:
         print(f"  line {line} {mode}: no results"); return None
     frame_dates = frame_dates[:n]
+    rms_by_i = rms_by_i or {}
 
     # global resistivity colour scale (5–95 pct across all timesteps, log-ish)
     allres = np.concatenate(
         [mr.df["Resistivity(ohm.m)"].to_numpy() for mr in k.meshResults]
     )
     vmin, vmax = np.nanpercentile(allres, [5, 95])
+
+    # difference(%) is auto-computed by ResIPy for time-lapse (vs survey 0)
+    has_diff = mode == "timelapse" and all(
+        "difference(percent)" in mr.df.columns for mr in k.meshResults)
+    if has_diff and n > 1:
+        alldiff = np.concatenate(
+            [k.meshResults[j].df["difference(percent)"].to_numpy()
+             for j in range(1, n)])
+        dlim = float(np.nanpercentile(np.abs(alldiff), 95)) or 1.0
+    else:
+        has_diff = False
 
     d10, v10 = vwc_series(vwc, line, 10)
     d40, v40 = vwc_series(vwc, line, 40)
@@ -246,8 +269,9 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
 
     def draw(i):
         fig.clf()
-        gs = fig.add_gridspec(3, 2, height_ratios=[1, 1, 3],
-                              width_ratios=[30, 1], hspace=0.45, wspace=0.04)
+        hr = [1, 1, 3, 3] if has_diff else [1, 1, 3]
+        gs = fig.add_gridspec(len(hr), 2, height_ratios=hr,
+                              width_ratios=[30, 1], hspace=0.5, wspace=0.04)
         ax10 = fig.add_subplot(gs[0, 0])
         ax40 = fig.add_subplot(gs[1, 0], sharex=ax10)
         axsec = fig.add_subplot(gs[2, 0])
@@ -277,15 +301,30 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
                       use_pyvista=False, color_bar=False)
         axsec.set_xlabel("along-line distance [m]", fontsize=9)
         axsec.set_ylabel("elevation [m]", fontsize=9)
-        rms = getattr(k.meshResults[i], "rms", None) or ""
+        rms = rms_by_i.get(i)
+        rms_s = f"RMS={rms:.2f}" if rms is not None else ""
         axsec.set_title(
-            f"Inverted resistivity [Ω·m]  ({vmin:.1f}–{vmax:.1f})  {rms}",
+            f"Inverted resistivity [Ω·m]  ({vmin:.1f}–{vmax:.1f})  {rms_s}",
             fontsize=9, loc="left")
         sm = plt.cm.ScalarMappable(
             cmap="viridis", norm=plt.Normalize(vmin=vmin, vmax=vmax))
         plt.colorbar(sm, cax=axcb).set_label("ρ [Ω·m]", fontsize=8)
 
-    fig = plt.figure(figsize=FIGSIZE)
+        if has_diff:
+            axd = fig.add_subplot(gs[3, 0])
+            axdc = fig.add_subplot(gs[3, 1])
+            k.showResults(index=i, ax=axd, attr="difference(percent)",
+                          sens=False, color_map="bwr", vmin=-dlim, vmax=dlim,
+                          use_pyvista=False, color_bar=False)
+            axd.set_xlabel("along-line distance [m]", fontsize=9)
+            axd.set_ylabel("elevation [m]", fontsize=9)
+            axd.set_title(f"Δρ vs {frame_dates[0]} [%]  (±{dlim:.0f}%)",
+                          fontsize=9, loc="left")
+            smd = plt.cm.ScalarMappable(
+                cmap="bwr", norm=plt.Normalize(vmin=-dlim, vmax=dlim))
+            plt.colorbar(smd, cax=axdc).set_label("Δρ [%]", fontsize=8)
+
+    fig = plt.figure(figsize=(FIGSIZE[0], FIGSIZE[1] * (1.35 if has_diff else 1)))
     paths = []
     for i in range(n):
         draw(i)
@@ -294,10 +333,10 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
         paths.append(p)
     plt.close(fig)
 
-    # timelapse: scrubbable HTML (slider + ← → step, the GIF can't seek).
-    # individual: a GIF quick-look is fine (surveys are independent).
+    # timelapse: MP4 (single portable file, seekable in any player — the GIF
+    # can't seek). individual: a GIF quick-look is fine (surveys independent).
     if mode == "timelapse":
-        return write_scrubber(outdir, line, mode, paths, frame_dates)
+        return write_mp4(outdir, line, mode, paths)
 
     from PIL import Image
 
@@ -309,47 +348,65 @@ def render_gif(line, mode, k, frame_dates, vwc, outdir: Path):
     return gif
 
 
-def write_scrubber(outdir: Path, line, mode, paths, frame_dates):
-    """Self-contained HTML viewer over the saved frames: slider, prev/next
-    buttons, ← → arrow keys, play/pause. Needs no codec or server."""
-    rels = [str(p.relative_to(outdir)) for p in paths]
-    dates = [str(d) for d in frame_dates[:len(paths)]]
-    html = """<!doctype html><meta charset=utf-8>
-<title>Line {line} {mode}</title>
-<style>body{{font-family:sans-serif;margin:0;background:#111;color:#eee}}
-#bar{{padding:8px;display:flex;gap:10px;align-items:center}}
-img{{display:block;max-width:100%;margin:auto}}
-input[type=range]{{flex:1}} button{{font-size:16px;padding:2px 10px}}</style>
-<div id=bar>
- <button onclick=step(-1)>◀</button>
- <button id=play onclick=toggle()>▶</button>
- <button onclick=step(1)>▶▶</button>
- <input id=s type=range min=0 max={last} value=0 oninput=show(this.value)>
- <span id=lbl></span>
-</div>
-<img id=im>
-<script>
-const F={frames}, D={dates};
-let i=0, t=null;
-const im=document.getElementById('im'), s=document.getElementById('s'),
-      lbl=document.getElementById('lbl');
-function show(k){{i=+k;im.src=F[i];s.value=i;
-  lbl.textContent=(i+1)+'/'+F.length+'  '+D[i];}}
-function step(d){{show((i+d+F.length)%F.length);}}
-function toggle(){{const b=document.getElementById('play');
-  if(t){{clearInterval(t);t=null;b.textContent='▶';}}
-  else{{t=setInterval(()=>step(1),{ms});b.textContent='⏸';}}}}
-document.onkeydown=e=>{{if(e.key=='ArrowRight')step(1);
-  else if(e.key=='ArrowLeft')step(-1);
-  else if(e.key==' '){{e.preventDefault();toggle();}}}};
-show(0);
-</script>
-""".format(line=line, mode=mode, last=len(paths) - 1,
-           frames=json.dumps(rels), dates=json.dumps(dates),
-           ms=int(1000 / FPS))
-    out = outdir / f"line_{line}_{mode}.html"
-    out.write_text(html)
-    print(f"  saved {out.relative_to(REPO)}  ({len(paths)} frames, scrubbable)")
+def write_mp4(outdir: Path, line, mode, paths):
+    """H.264 MP4 from the saved frames. `bbox_inches='tight'` makes frames vary
+    in size, so pad each to a common even canvas (H.264 needs even dims)."""
+    import imageio.v2 as iio
+
+    imgs = [iio.imread(p) for p in paths]
+    H = max(im.shape[0] for im in imgs); W = max(im.shape[1] for im in imgs)
+    H += H % 2; W += W % 2
+    out = outdir / f"line_{line}_{mode}.mp4"
+    w = iio.get_writer(out, fps=FPS, codec="libx264", quality=8,
+                       macro_block_size=None, ffmpeg_log_level="error")
+    for im in imgs:
+        if im.ndim == 3 and im.shape[2] == 4:
+            im = im[:, :, :3]
+        canvas = np.full((H, W, 3), 255, np.uint8)
+        canvas[:im.shape[0], :im.shape[1]] = im
+        w.append_data(canvas)
+    w.close()
+    print(f"  saved {out.relative_to(REPO)}  ({len(paths)} frames)")
+    return out
+
+
+def survey_rms(k):
+    """Map survey/frame index → final RMS misfit, parsed from invdir/R2.out.
+    Datasets appear in R2.out in survey order; the i-th `Processing dataset`
+    block's `Final RMS Misfit` is frame i."""
+    out_file = Path(k.dirname) / "R2.out"   # k.dirname is already <workdir>/invdir
+    if not out_file.exists():
+        return {}
+    rms, idataset = {}, -1
+    for line in out_file.read_text().splitlines():
+        t = line.split()
+        if len(t) >= 2 and t[0] == "Processing" and t[1] == "dataset":
+            idataset += 1
+        elif t[:2] == ["Final", "RMS"] and idataset >= 0:
+            rms[idataset] = float(t[-1])
+    return rms
+
+
+def plot_convergence(line, mode, rms_by_i, frame_dates, outdir: Path):
+    """Final RMS misfit per survey over the campaign. RMS≈1 = data fit to its
+    assigned (reciprocal) error level; >1 underfit, <1 overfit."""
+    if not rms_by_i:
+        print(f"  line {line} {mode}: no RMS parsed"); return None
+    idx = sorted(i for i in rms_by_i if i < len(frame_dates))
+    dates = [frame_dates[i] for i in idx]
+    rms = [rms_by_i[i] for i in idx]
+    fig, ax = plt.subplots(figsize=(11, 3.2))
+    ax.plot(dates, rms, ".-", ms=4, lw=0.8, color="#1f77b4")
+    ax.axhline(1.0, color="r", ls="--", lw=1, label="target RMS = 1")
+    ax.set_ylabel("final RMS misfit")
+    ax.set_ylim(0, max(2.5, np.nanpercentile(rms, 99)))
+    ax.set_title(f"Line {line} · {mode} · convergence "
+                 f"(median {np.nanmedian(rms):.2f}, {len(rms)} surveys)",
+                 fontsize=11, fontweight="bold", loc="left")
+    ax.grid(alpha=0.3); ax.legend(fontsize=8)
+    out = outdir / f"convergence_{line}_{mode}.png"
+    fig.tight_layout(); fig.savefig(out, dpi=130); plt.close(fig)
+    print(f"  saved {out.relative_to(REPO)}")
     return out
 
 
@@ -373,7 +430,9 @@ def process(line: str, modes: list[str], every: int, vwc):
         k = run_inversion(line, mode, elec, protodir, workdir)
         outdir = OUT_ROOT / line / mode
         outdir.mkdir(parents=True, exist_ok=True)
-        render_gif(line, mode, k, frame_dates, vwc, outdir)
+        rms_by_i = survey_rms(k)
+        render_gif(line, mode, k, frame_dates, vwc, outdir, rms_by_i)
+        plot_convergence(line, mode, rms_by_i, frame_dates, outdir)
 
 
 def main():

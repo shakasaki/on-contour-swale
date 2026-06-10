@@ -1,5 +1,15 @@
 # TODO
 
+## 2026-06-10 — reciprocal errors + difference + convergence
+- [x] **Reciprocal-error weighting** — ProtocolDC 7th col `|R|·recip_err_pct/100`
+  (floor 1%), `k.err=True`. Inversions converge to RMS≈1.
+- [x] **Difference imaging** — `postProcTl()` + appended Δρ(%) panel in timelapse render.
+- [x] **Convergence plots** — `survey_rms` (parse `invdir/R2.out`) + `plot_convergence`.
+  Median RMS A 1.04 / B 1.00 / C 1.00 / D 1.32.
+- [x] **MP4 output** — `write_mp4` (imageio-ffmpeg) replaces the broken HTML scrubber.
+- [ ] **Bad-survey-day spikes** — RMS>2 spikes in convergence = whole-survey
+  failures; ties into the global day-blacklist TODO.
+
 ## 2026-06-09 — electrode-Z decision + inversion rerun
 - [x] **Electrode Z source decided: 24.05.30 scan DEM** (Alexis) — sample electrode
   Z from the DEM via `scan_dem.elevation`; the temporal mismatch isn't worth

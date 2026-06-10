@@ -3,6 +3,23 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-06-10 — Reciprocal-error weighting, difference imaging, convergence, MP4
+
+### Added
+- **Reciprocal-error weighting**: `write_protocols` now writes the ProtocolDC
+  "DC 2D + err" 7th column (`|R|·recip_err_pct/100`, floored at `ERR_FLOOR_PCT`
+  = 1 %) and `run_inversion` sets `k.err=True`, so R2 weights each datum by its
+  measured reciprocal error instead of the default homogeneous model. Initial
+  misfit becomes honest (~10×) and inversions converge to RMS≈1.
+- **Difference imaging**: time-lapse runs call `k.postProcTl()` and the render
+  **appends** a Δρ(%)-vs-reference panel (bwr, 0-centred, ±95th-pct scale) below
+  the resistivity section. Individual mode unchanged.
+- **Convergence plots**: `survey_rms` parses `invdir/R2.out` for the final RMS
+  per survey; `plot_convergence` saves `convergence_<line>_<mode>.png` (RMS vs
+  date, target=1). Median RMS A 1.04 / B 1.00 / C 1.00 / D 1.32.
+- **MP4 output**: `write_mp4` (imageio-ffmpeg) replaces the fragile relative-path
+  HTML scrubber for time-lapse — single seekable file. New dep: `imageio-ffmpeg`.
+
 ## 2026-06-09 — Inversion topography finalized + scrubbable time-lapse output
 
 ### Added
