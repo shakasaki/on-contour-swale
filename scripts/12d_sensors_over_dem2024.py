@@ -38,7 +38,7 @@ OUT_DEM_XYZ = ROOT / "plots" / "12d_dem2024_rot180_raster.xyz"
 OUT_SENSOR_CSV = ROOT / "plots" / "12d_sensor_locations_rot180.csv"
 OUT_ELECTRODE_CSV = ROOT / "plots" / "12d_electrode_locations_rot180.csv"
 
-MARGIN = 2.0
+PLOT_MARGIN = 3.0   # around instruments for the cropped axes
 HILLSHADE_N = 500
 
 SWALE_COLOR = "#1f77b4"
@@ -48,7 +48,27 @@ LINE_COLORS = {
     "B": "tab:orange",
     "C": "tab:green",
     "D": "tab:red",
-    "E": "tab:purple",
+}  # line E excluded from paper figure
+
+# Display names keyed by frozenset of SMS IDs
+_DISPLAY_NAME: dict[frozenset, str] = {
+    frozenset({"SMS01", "SMS02"}): "Top slope",
+    frozenset({"SMS10"}): "Step",
+    frozenset({"SMS03", "SMS04", "SMS05"}): "Mound",
+    frozenset({"SMS06", "SMS07"}): "Bottom 1",
+    frozenset({"SMS08", "SMS09"}): "Bottom 2",
+    frozenset({"SMS11", "SMS12"}): "Top slope",
+    frozenset({"SMS13", "SMS14"}): "Mid slope",
+    frozenset({"SMS15", "SMS16"}): "Bottom slope",
+}
+
+# Per-label annotation offsets (points) to avoid crowding
+_LABEL_OFFSET: dict[str, tuple[int, int]] = {
+    "Top slope": (-70, 0),   # swale top — move left to avoid overlap with line B
+    "Mound":     (-58, 0),   # left of marker, clear of Step
+    "Step":      (6,   0),
+    "Bottom 1":  (6,   6),
+    "Bottom 2":  (6,  -8),
 }
 
 
@@ -128,15 +148,14 @@ def rasterize_dem(
 
 
 def dem_hillshade(grid_z: np.ndarray):
-    """Return a terrain hillshade image for a rasterized DEM grid."""
+    """Return a greyscale hillshade [0,1]; NaN cells → 0.5 (neutral grey)."""
+    nan_mask = ~np.isfinite(grid_z)
+    filled = grid_z.copy()
+    filled[nan_mask] = np.nanmean(grid_z)
     ls = LightSource(azdeg=315, altdeg=45)
-    rgb = ls.shade(
-        np.ma.masked_invalid(grid_z),
-        cmap=plt.get_cmap("terrain"),
-        vert_exag=3,
-        blend_mode="soft",
-    )
-    return rgb
+    hs = ls.hillshade(filled, vert_exag=5)
+    hs[nan_mask] = 0.5
+    return hs
 
 
 def export_raster_xyz(
@@ -211,27 +230,20 @@ def main() -> None:
         np.array([r["x"] for r in records], dtype=float),
         np.array([r["y"] for r in records], dtype=float),
     )
-    ex_all, ey_all = rotate_xy_180(
-        electrode_table["X_av"].to_numpy(),
-        electrode_table["Y_av"].to_numpy(),
+    # Crop to active instruments only (lines A–D + sensors); exclude line E
+    active_elec = electrode_table.filter(pl.col("Line") != "E")
+    ex_active, ey_active = rotate_xy_180(
+        active_elec["X_av"].to_numpy(),
+        active_elec["Y_av"].to_numpy(),
     )
-    x_min = min(
-        float(x_all.min()), float(ex_all.min()), float(dem_xyz[:, 0].min())
-    )
-    x_max = max(
-        float(x_all.max()), float(ex_all.max()), float(dem_xyz[:, 0].max())
-    )
-    y_min = min(
-        float(y_all.min()), float(ey_all.min()), float(dem_xyz[:, 1].min())
-    )
-    y_max = max(
-        float(y_all.max()), float(ey_all.max()), float(dem_xyz[:, 1].max())
-    )
-    xlim = (x_min - MARGIN, x_max + MARGIN)
-    ylim = (y_min - MARGIN, y_max + MARGIN)
+    x_pts = np.concatenate([x_all, ex_active])
+    y_pts = np.concatenate([y_all, ey_active])
+    xlim = (float(x_pts.min()) - PLOT_MARGIN, float(x_pts.max()) + PLOT_MARGIN)
+    ylim = (float(y_pts.min()) - PLOT_MARGIN, float(y_pts.max()) + PLOT_MARGIN)
 
+    # Rasterize DEM over the plot extent only (faster + no edge NaN artifacts)
     grid_x, grid_y, grid_z = rasterize_dem(dem_xyz, xlim, ylim)
-    rgb = dem_hillshade(grid_z)
+    rgb = dem_hillshade(grid_z)  # 2D greyscale [0,1]
 
     n_xyz = export_raster_xyz(grid_x, grid_y, grid_z, OUT_DEM_XYZ)
     n_sensor = export_sensor_csv(records, OUT_SENSOR_CSV)
@@ -242,7 +254,10 @@ def main() -> None:
         rgb,
         extent=(xlim[0], xlim[1], ylim[0], ylim[1]),
         origin="lower",
-        alpha=0.65,
+        cmap="gray",
+        vmin=0.0,
+        vmax=1.0,
+        alpha=0.85,
         zorder=1,
     )
 
@@ -277,15 +292,15 @@ def main() -> None:
         )
 
     landmark_style = {
-        "weather station": ("*", "gold"),
-        "left soil profile (closer to swale)": ("D", "saddlebrown"),
-        "right soil profile (further from swale)": ("D", "peru"),
+        "weather station": ("*", "gold", "Weather station"),
+        "left soil profile (closer to swale)": ("D", "saddlebrown", "Soil profile"),
+        "right soil profile (further from swale)": ("D", "peru", "Soil profile"),
     }
     for lm in landmarks:
         style = landmark_style.get(str(lm["label"]).lower())
         if style is None:
             continue
-        marker, color = style
+        marker, color, short_label = style
         x_plot, y_plot = rotate_xy_180(lm["x"], lm["y"])
         ax.scatter(
             [x_plot],
@@ -298,7 +313,7 @@ def main() -> None:
             zorder=3,
         )
         ax.annotate(
-            str(lm["label"]),
+            short_label,
             (float(x_plot), float(y_plot)),
             xytext=(7, 7),
             textcoords="offset points",
@@ -328,11 +343,12 @@ def main() -> None:
             linewidths=2.0,
             zorder=3,
         )
-        short_ids = ",".join(sid.replace("SMS", "") for sid in ids)
+        display = _DISPLAY_NAME.get(frozenset(ids), ",".join(ids))
+        dx, dy = _LABEL_OFFSET.get(display, (6, 0))
         ax.annotate(
-            f"SMS {short_ids}",
+            display,
             (float(x_plot), float(y_plot)),
-            xytext=(6, 0),
+            xytext=(dx, dy),
             textcoords="offset points",
             fontsize=8,
             ha="left",
@@ -373,7 +389,7 @@ def main() -> None:
         Line2D(
             [0], [0], color=color, lw=1.3, marker="o",
             markerfacecolor=color, markeredgecolor="black",
-            markersize=6, label=f"Electrode line {line}",
+            markersize=6, label=f"ERT line {line}",
         )
         for line, color in LINE_COLORS.items()
     )
@@ -386,14 +402,10 @@ def main() -> None:
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     ax.set_aspect("equal")
-    ax.set_xlabel("X (m, rotated survey frame)")
-    ax.set_ylabel("Y (m, rotated survey frame)")
-    ax.set_title(
-        "DEM_2024_07_25 with sensors, landmarks, and electrodes\n"
-        "All coordinates rotated 180 degrees: (x, y) -> (-x, -y)"
-    )
+    ax.set_xlabel("Easting (m)")
+    ax.set_ylabel("Northing (m)")
     fig.tight_layout()
-    fig.savefig(OUT_PLOT, dpi=180, bbox_inches="tight")
+    fig.savefig(OUT_PLOT, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {OUT_PLOT.relative_to(ROOT)}")
     print(f"wrote {OUT_DEM_XYZ.relative_to(ROOT)}  ({n_xyz:,} xyz rows)")
