@@ -1,0 +1,18 @@
+Context:
+
+You will help me design a geophysical geoelectric experiment. I have already a setup in place, where there are cables running in the ground and on each cable there are 10 electrodes attached. In total, I have 6 such cables in place, so 60 electrodes. These are attached to a machine called an OhmPi, which measures the electrical resistivity of the ground. Up until now, I have treated every cable individually, that is, I take measurements along one cable and then proceed to the next. Now I want to combine measurements between cables and see which of these measurements make sense and giv a high signal-to-noise ratio.
+
+Procedure:
+
+The electrical resistivity is obtained by injecting a small current between two electrodes, lets call them A and B, and measuring the potential difference between two other electrodes, which we will call M and N. Any combination of AB and MN is possible, but for 60 electrodes this would make many combinations. Therefore, people usually choose standard "arrays" for exampe wenner schlumberger or dipole dipole. I want to explore the full 3D potential of my setup.
+
+Measurements:
+
+We can interchange the roles between A and B, and M and N respectively, and this should not make a difference in the measurement. This is because just the current direction is reversed. Therefore, I am not interested in measurements where the role of A is taken by B, and the role of M by N (and vice versa).
+
+Reciprocal measurements on the other hand are when A becomes M and B becomes N, and vice versa. Then the current injection electrodes are switched with the ones that measure the potential difference. This sort of measurements are very interesting as they provide the reciprocal error. I want to omit the reciprocal measurements for now because that would make many combinations. But when I decide on a measurement pattern, I want to then include their reciprocals as well.
+
+Objective.
+First step: Assume you have 60 electrodes, corresponding to the 6 lines. Each line has 10 electrodes. I want you to first start by giving me all the possible combinations between these 60 electrodes, omitting the ones stated above (the ones that reverse current flow and the reciprocal ones).
+
+
