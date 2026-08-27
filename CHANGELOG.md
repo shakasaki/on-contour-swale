@@ -3,6 +3,43 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-08-26 — Desktop memory-sync fix, SMS line transects, ZentraCloud fetch scripts
+
+### Added
+- **`scripts/13_sms_line_transects.py`**: elevation transects of SMS sensor
+  pairs (swale vs control) along each treatment's along-slope principal axis,
+  sampled from the `DEM_2024_07_25` point cloud; plus a plan-view companion
+  overlaying both transect axes and electrode Line A as a sanity check. Run
+  and verified — output matches expected swale mound/step/bottom-slope
+  topography vs the flatter control profile.
+- **`scripts/fetch_zentracloud.py`**: pulls raw readings for the three ZL6
+  loggers (05511/19570/19574) from the ZENTRA Cloud **v5** API (new
+  `zentracloud` PyPI SDK, `X-API-Key` auth) to `data/zentracloud/*.parquet`.
+  Blocked until the account is migrated off the legacy platform.
+- **`scripts/fetch_zentracloud_legacy.py`**: same, against the **legacy**
+  v3/v4 REST API (`Authorization: Token`, `/api/v4/get_readings/`) that the
+  account currently uses. Built from documentation only (no working
+  credentials yet to verify against) — pagination stop-condition and
+  response envelope need confirming against a real response once the new
+  account is live.
+- `pyproject.toml`: added `zentracloud` and `requests` dependencies for the
+  two fetch scripts above.
+
+### Fixed
+- **Cross-machine Claude memory sync for this repo (desktop)**: this
+  machine's session launches from `/mnt/data/git/on-contour-swale`, which
+  hashes to a different Claude project dir than `~/git/on-contour-swale`
+  (same repo, bind-mounted) — `dotsync/repos/on-contour-swale-claude.yaml`
+  had no `desktop` path override, so this machine's real memory dir was
+  never covered by sync. Added the override and reapplied via `stsync`.
+  Fixing it hit a near-miss: restarting Syncthing to clear a "folder marker
+  missing" error triggered a rescan of the still-empty new folder, which
+  broadcast a delete-all to the ashakas laptop and wiped its copy. Recovered
+  by repopulating the new folder from the intact copy before
+  unpausing/rescanning; ashakas re-pulled to 100%. Full incident and the
+  reusable "populate before scan" rule are in memory
+  (`on-contour-swale-memory-sync.md`, `feedback_syncthing_populate_before_scan.md`).
+
 ## 2026-06-10 — Reciprocal-error weighting, difference imaging, convergence, MP4
 
 ### Added

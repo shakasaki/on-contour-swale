@@ -1,5 +1,19 @@
 # TODO
 
+## 2026-08-26 — ZentraCloud fetch
+- [ ] **Verify `fetch_zentracloud_legacy.py` against a live response** —
+  once the new ZentraCloud account is active: run with a narrow
+  `--start-date`/`--end-date`, confirm the response envelope and pagination
+  stop-condition match what's assumed (built from docs only, unverified).
+- [ ] **Rotate the ZentraCloud API token** — a token was pasted into a
+  Claude Code chat on 2026-08-26 while debugging auth; rotate it once the
+  new account situation is sorted, don't keep using that value.
+- [ ] **Map ZentraCloud readings onto `swale`'s canonical schema** — both
+  fetch scripts currently write raw API fields
+  (`measurement`/`sensor_name`/`units` etc.), not `variable`/`sensor_type`
+  from `schema.py`. Do this once real sample data confirms the string
+  mappings needed.
+
 ## 2026-06-10 — reciprocal errors + difference + convergence
 - [x] **Reciprocal-error weighting** — ProtocolDC 7th col `|R|·recip_err_pct/100`
   (floor 1%), `k.err=True`. Inversions converge to RMS≈1.

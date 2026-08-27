@@ -20,6 +20,8 @@ dependencies = [
     "mne>=1.7",
     "pywavelets>=1.5",
     "pyvista>=0.43",
+    "zentracloud>=0.1.3",
+    "requests>=2.31",
 ]
 
 [project.optional-dependencies]
