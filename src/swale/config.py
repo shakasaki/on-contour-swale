@@ -70,7 +70,7 @@ def load_settings(path: Path | None = None) -> Settings:
     equilibration = Equilibration(
         days_default=int(eq["days_default"]),
         days_overrides={str(k): int(v) for k, v in eq.get("days_overrides", {}).items()},
-        variables=tuple(eq.get("variables", ["moisture", "soil_temp", "bulk_ec"])),
+        variables=tuple(eq.get("variables", ["moisture", "soil_temp", "sat_extract_ec"])),
     )
     data = raw["data"]
     sf = raw.get("spatial_frame", {"raw_x_sign": 1, "raw_y_sign": 1})

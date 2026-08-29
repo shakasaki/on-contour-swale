@@ -11,6 +11,7 @@ from swale.loader import load_swale_dataset
 from tests.conftest import (
     make_csv_fixture,
     make_metadata_fixture,
+    make_v5_parquet_fixture,
     make_xlsx_fixture,
 )
 
@@ -56,6 +57,44 @@ def test_loader_dedup_prefers_xlsx_on_overlap(tmp_path: Path):
     # Full-precision XLSX value retained, not the rounded CSV one.
     assert sub["value"].item() == pytest.approx(0.301234)
     assert sub["source_format"].item() == "xlsx"
+
+
+def test_loader_prefers_v5_over_csv_and_carries_error_code(tmp_path: Path):
+    data_root, md = _build_minimal_dataset(tmp_path)
+
+    # CSV: rounded value at 2024-05-25 01:15 field-local (IST).
+    make_csv_fixture(
+        data_root / "19570" / "z6-19570 - top(z6-19570)-Configuration 1-X.csv",
+        rows=[("25/05/2024 01:15:00",
+                 0.300, 18.5, 1.20, 22.0, 1.5, 95.0, 0.0, 0.0,
+                 100, 8000, 95.0, 24.0)],
+    )
+    # v5 parquet for the same logger: same instant (01:15 IST == 19:45 UTC
+    # the day before), full precision, plus a flagged reading on port 2.
+    make_v5_parquet_fixture(
+        tmp_path / "zentracloud" / "19570.parquet",
+        rows=[
+            (datetime(2024, 5, 24, 19, 45), 1, "TEROS 12", "Water Content",
+             0.301234, "m³/m³", 0),
+            (datetime(2024, 5, 24, 19, 45), 2, "TEROS 12", "Water Content",
+             0.0, "m³/m³", 137),
+        ],
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        df = load_swale_dataset(data_root, md, grid="none")
+
+    m1 = df.filter((pl.col("variable") == "moisture")
+                   & (pl.col("sensor_id") == "SMS01"))
+    assert m1.height == 1
+    assert m1["value"].item() == pytest.approx(0.301234)   # v5 beat the CSV
+    assert m1["source_format"].item() == "zentracloud"
+    assert m1["timestamp"].item() == datetime(2024, 5, 25, 1, 15)  # IST
+
+    m2 = df.filter((pl.col("variable") == "moisture")
+                   & (pl.col("sensor_id") == "SMS02"))
+    assert m2["error_code"].item() == 137
 
 
 def test_loader_emits_warning_on_disagreement(tmp_path: Path):

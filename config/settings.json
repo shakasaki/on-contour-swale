@@ -2,7 +2,7 @@
   "equilibration": {
     "days_default": 14,
     "days_overrides": {},
-    "variables": ["moisture", "soil_temp", "bulk_ec"]
+    "variables": ["moisture", "soil_temp", "sat_extract_ec"]
   },
   "data": {
     "data_root": "data/unpacked",

@@ -8,7 +8,9 @@ polars DataFrame:
     sensor_type      Utf8      ('TEROS12' | 'ATMOS14' | 'ECRN100' | 'BATTERY' | 'BAROMETER')
     variable         Utf8      canonical name from schema.VARIABLE_MAP
     value            Float64
-    source_format    Utf8      'csv' or 'xlsx'
+    error_code       Int32     METER quality code; 0 = OK, non-zero = flagged.
+                               Null for CSV/XLSX rows (those exports carry no code).
+    source_format    Utf8      'csv', 'xlsx' or 'zentracloud'
     source_file      Utf8      basename of the file the row came from
     config_label     Utf8      'Config 1', 'Config 5', ... (sheet/file label)
 
@@ -29,10 +31,20 @@ import polars as pl
 
 from swale.schema import (
     KEPT_SENSOR_TYPES,
+    V5_MEASUREMENT_MAP,
+    V5_SENSOR_TYPE_MAP,
     normalize_sensor_type,
     normalize_variable,
     parse_port_label,
 )
+
+# The field site (and therefore every METER export) runs on India Standard
+# Time, UTC+05:30, which has no daylight-saving transitions. The CSV/XLSX
+# exports carry naive local timestamps; the v5 API carries UTC. Converting
+# through this zone and dropping the offset puts v5 rows on the same clock
+# as the rest of the loader. Verified 2026-08-29 by cross-correlating v5 vs
+# CSV soil-temperature over their overlap (r = 1.000 at +5.5 h).
+_FIELD_TZ = "Asia/Kolkata"
 
 # CSV timestamps: '25/05/2024 01:15:00'.
 _CSV_TS_FORMAT = "%d/%m/%Y %H:%M:%S"
@@ -97,6 +109,7 @@ def _frame_from_records(
             "sensor_type":   [sensor_type] * len(timestamps),
             "variable":      [variable] * len(timestamps),
             "value":         vals,
+            "error_code":    [None] * len(timestamps),
             "source_format": [source_format] * len(timestamps),
             "source_file":   [source_file] * len(timestamps),
             "config_label":  [config_label] * len(timestamps),
@@ -112,6 +125,7 @@ _LONG_SCHEMA: dict[str, pl.DataType] = {
     "sensor_type":   pl.Utf8,
     "variable":      pl.Utf8,
     "value":         pl.Float64,
+    "error_code":    pl.Int32,
     "source_format": pl.Utf8,
     "source_file":   pl.Utf8,
     "config_label":  pl.Utf8,
@@ -332,3 +346,79 @@ def read_logger_xlsx(path: Path) -> pl.DataFrame:
     if not frames:
         return _empty_long_frame()
     return pl.concat(frames, how="vertical")
+
+
+# ---------------------------------------------------------------------------
+# ZENTRA Cloud v5 parquet reader
+# ---------------------------------------------------------------------------
+
+def read_logger_parquet(path: Path) -> pl.DataFrame:
+    """Read one ``fetch_zentracloud.py`` output parquet into long format.
+
+    The parquet holds the raw v5 ``Reading`` fields
+    (``datetime, timestamp, port_num, sensor_name, measurement, value, unit,
+    error_code``) for a single logger. This maps them onto the same
+    long-format schema as :func:`read_logger_csv`:
+
+    * ``datetime`` (UTC) → naive field-local time via ``_FIELD_TZ``.
+    * ``sensor_name`` → canonical ``sensor_type``; rows whose type is not in
+      ``KEPT_SENSOR_TYPES`` (e.g. "Signal Strength") are dropped.
+    * ``measurement`` → canonical ``variable`` via ``V5_MEASUREMENT_MAP``;
+      unmapped measurements ("Raw VWC", "Pore Water EC", "Dew Point", …) are
+      dropped.
+    * ``error_code`` is carried through unchanged (0 = OK).
+    * ``source_format`` = ``"zentracloud"``, ``config_label`` = ``"v5"``.
+
+    Args:
+        path: Path to ``data/zentracloud/<serial>.parquet``.
+
+    Returns:
+        Long DataFrame with the module-level schema. Empty frame if the file
+        has no rows or nothing maps.
+
+    Raises:
+        FileNotFoundError: If ``path`` doesn't exist.
+
+    See Also:
+        read_logger_csv: Counterpart for the per-logger CSV exports.
+    """
+    if not path.exists():
+        raise FileNotFoundError(path)
+
+    raw = pl.read_parquet(path)
+    if raw.height == 0:
+        return _empty_long_frame()
+
+    df = raw.select(
+        timestamp=(
+            pl.col("datetime")
+              .dt.convert_time_zone(_FIELD_TZ)
+              .dt.replace_time_zone(None)
+              .cast(pl.Datetime("us"))
+        ),
+        port=pl.col("port_num").cast(pl.Int64),
+        sensor_type=pl.col("sensor_name")
+            .replace_strict(V5_SENSOR_TYPE_MAP, default=None),
+        variable=pl.col("measurement")
+            .replace_strict(V5_MEASUREMENT_MAP, default=None),
+        value=pl.col("value").cast(pl.Float64),
+        error_code=pl.col("error_code").cast(pl.Int32),
+    ).filter(
+        pl.col("variable").is_not_null()
+        & pl.col("sensor_type").is_in(list(KEPT_SENSOR_TYPES))
+        & pl.col("port").is_between(1, 8)
+    )
+    if df.height == 0:
+        return _empty_long_frame()
+
+    return df.select(
+        pl.col("timestamp"),
+        pl.col("port").cast(pl.UInt8),
+        pl.col("sensor_type"),
+        pl.col("variable"),
+        pl.col("value"),
+        pl.col("error_code"),
+        pl.lit("zentracloud").alias("source_format"),
+        pl.lit(path.name).alias("source_file"),
+        pl.lit("v5").alias("config_label"),
+    ).cast(_LONG_SCHEMA)

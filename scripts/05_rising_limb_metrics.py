@@ -26,6 +26,7 @@ Run from project root::
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -118,7 +119,7 @@ def measure_event(
             "baseline_vwc": base, "peak_vwc": float("nan"),
             "delta_vwc": float("nan"), "t_to_peak_h": float("nan"),
             "mean_dvdt_per_h": float("nan"),
-            "peak_time": np.datetime64("NaT", "ns"),
+            "peak_time": None,
             "responded": False,
         }
 
@@ -135,7 +136,9 @@ def measure_event(
         "delta_vwc":      delta,
         "t_to_peak_h":    dt_h,
         "mean_dvdt_per_h": mean_rate,
-        "peak_time":      peak_ts,
+        # Python datetime (not np.datetime64) so pl.from_dicts can mix it with
+        # the None returned when a sensor has no post-event data.
+        "peak_time":      peak_ts.astype("datetime64[us]").astype(datetime),
         "responded":      bool(np.isfinite(delta) and delta >= MIN_DELTA_VWC),
     }
 

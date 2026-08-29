@@ -1,16 +1,28 @@
 # TODO
 
-## 2026-08-29 — bottom logger TEROS 12 faults
-- [ ] **`z6-19574` (bottom) — probe faults, per full v5 range 2026-05-10 → 08-29**
-  (`error_code` 136/137 in `data/zentracloud/19574.parquet`):
-  - **Port 6: dead** — 100% flagged across the whole range, already failing
-    before the last manual export (2026-05-11). Replace on site.
-  - **Port 5: intermittent, degrading** — monthly error frac ~9% May →
-    ~33% Jun/Jul → ~22% Aug, first flag 2026-05-25. Reseat/replace.
-  - **Port 3: transient** — clean except 2026-06-13 → 08-03, then recovered.
-  - Ports 1/2/4 clean; `z6-05511` and `z6-19570` fully clean.
-  - Loader must drop Port 6 and filter Ports 5/3 on `error_code != 0`;
-    needs the port→depth mapping to know which sensors these are.
+## 2026-08-29 — bottom logger TEROS 12 faults (full v5 history)
+- [ ] **`z6-19574` (bottom) — probe faults, on-site action needed.** From the
+  full v5 history (`notes/field_sensor_faults.md`):
+  - **SMS09 / `sw_b2_40` (Port 6): DEAD since 2026-03-28** — clean for ~22
+    months, then 12 % in March, 100 % from April. **Replace probe.**
+  - **SMS08 / `sw_b2_10` (Port 5): degrading since 2025-01-24** — ~20–25 %
+    flagged, intermittent. **Reseat/replace.**
+  - **SMS06 / `sw_b1_10` (Port 3): episodic** — bad Feb–Mar 2025 and
+    Mar–Aug 2026, recovered since 2026-08-03. Watch.
+  - Both SwF ("Bottom 2") depths compromised → SwF unusable as a clean
+    slope-position pair after early 2025.
+  - Loader carries `error_code`; analyses must filter `== 0`
+    (flagged v5 rows still have a bogus `value`, often 0.0).
+
+## 2026-08-29 — ZentraCloud v5 wired into loader
+- [ ] **`notes/figures_index.md` — refresh text for the new date range**
+  (dataset now 2024-05 → 2026-08, was → 2026-05).
+- [ ] **`scripts/11_per_location_tau.py` blocked** — needs the 5 dense
+  `data/DEM_xyz/24.05.30_-_con_sw_and_for_*.xyz` scans (only `*_11_59_00.xyz`
+  is in the checkout). Pre-existing; unrelated to the v5 work. τ math is
+  fine, only the hillshade map background fails.
+- [ ] **Re-run remaining scripts** not yet checked after the loader change:
+  02 / 02b / 03 (spectra), 09, 12* (DEM overlays).
 
 ## 2026-08-26 — ZentraCloud fetch
 - [x] **v5 fetch verified against a live account (2026-08-29)** — account
@@ -20,11 +32,11 @@
 - [x] **Rotated the ZentraCloud API token (2026-08-29)** — earlier tokens
   pasted into chat 2026-08-26 / 08-28 are dead; current key lives in
   `~/.zentracloud.env` (mode 600), not in shell rc or chat.
-- [ ] **Map ZentraCloud readings onto `swale`'s canonical schema** —
-  `fetch_zentracloud.py` writes raw API fields
-  (`measurement`/`sensor_name`/`unit` etc.), not `variable`/`sensor_type`
-  from `schema.py`. Do this once real sample data confirms the string
-  mappings needed.
+- [x] **Map ZentraCloud readings onto `swale`'s canonical schema (2026-08-29)**
+  — `read_logger_parquet` + `V5_MEASUREMENT_MAP`/`V5_SENSOR_TYPE_MAP`; wired
+  into `load_swale_dataset` as a source with priority above CSV; IST tz
+  conversion; `error_code` column added; EC split into
+  `sat_extract_ec`/`bulk_ec`. See memory `project_zentracloud_fetch`.
 
 ## 2026-06-10 — reciprocal errors + difference + convergence
 - [x] **Reciprocal-error weighting** — ProtocolDC 7th col `|R|·recip_err_pct/100`
