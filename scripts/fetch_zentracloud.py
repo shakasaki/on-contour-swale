@@ -2,10 +2,11 @@
 loggers at the site (05511 control, 19570 top, 19574 bottom), as an
 alternative to manually exporting a CSV dump from the web portal.
 
-NOTE (2026-08-26): our account is still on the legacy platform, not v5 —
-this script's ``X-API-Key`` auth will 401 until the account is migrated.
-Use ``fetch_zentracloud_legacy.py`` (v3/v4 REST API, ``Authorization: Token``)
-until then.
+Verified against a live v5 account on 2026-08-28 (account migrated to
+ZENTRA Cloud 2.0). Device IDs confirmed via ``client.v5.devices.list()``:
+``z6-05511`` (control), ``z6-19570`` (top), ``z6-19574`` (bottom); the
+``z6-05533`` Forest logger exists but is deliberately excluded, matching the
+loader.
 
 Writes one long-format parquet per logger to ``data/zentracloud/``:
 ``device_id, datetime, timestamp, port_num, sensor_name, measurement,

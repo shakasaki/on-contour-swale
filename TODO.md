@@ -1,16 +1,28 @@
 # TODO
 
+## 2026-08-29 — bottom logger TEROS 12 faults
+- [ ] **`z6-19574` (bottom) — probe faults, per full v5 range 2026-05-10 → 08-29**
+  (`error_code` 136/137 in `data/zentracloud/19574.parquet`):
+  - **Port 6: dead** — 100% flagged across the whole range, already failing
+    before the last manual export (2026-05-11). Replace on site.
+  - **Port 5: intermittent, degrading** — monthly error frac ~9% May →
+    ~33% Jun/Jul → ~22% Aug, first flag 2026-05-25. Reseat/replace.
+  - **Port 3: transient** — clean except 2026-06-13 → 08-03, then recovered.
+  - Ports 1/2/4 clean; `z6-05511` and `z6-19570` fully clean.
+  - Loader must drop Port 6 and filter Ports 5/3 on `error_code != 0`;
+    needs the port→depth mapping to know which sensors these are.
+
 ## 2026-08-26 — ZentraCloud fetch
-- [ ] **Verify `fetch_zentracloud_legacy.py` against a live response** —
-  once the new ZentraCloud account is active: run with a narrow
-  `--start-date`/`--end-date`, confirm the response envelope and pagination
-  stop-condition match what's assumed (built from docs only, unverified).
-- [ ] **Rotate the ZentraCloud API token** — a token was pasted into a
-  Claude Code chat on 2026-08-26 while debugging auth; rotate it once the
-  new account situation is sorted, don't keep using that value.
-- [ ] **Map ZentraCloud readings onto `swale`'s canonical schema** — both
-  fetch scripts currently write raw API fields
-  (`measurement`/`sensor_name`/`units` etc.), not `variable`/`sensor_type`
+- [x] **v5 fetch verified against a live account (2026-08-29)** — account
+  migrated to ZENTRA Cloud 2.0; `fetch_zentracloud.py` runs end-to-end,
+  device IDs confirmed. `fetch_zentracloud_legacy.py` deleted (v3/v4 path
+  unreachable).
+- [x] **Rotated the ZentraCloud API token (2026-08-29)** — earlier tokens
+  pasted into chat 2026-08-26 / 08-28 are dead; current key lives in
+  `~/.zentracloud.env` (mode 600), not in shell rc or chat.
+- [ ] **Map ZentraCloud readings onto `swale`'s canonical schema** —
+  `fetch_zentracloud.py` writes raw API fields
+  (`measurement`/`sensor_name`/`unit` etc.), not `variable`/`sensor_type`
   from `schema.py`. Do this once real sample data confirms the string
   mappings needed.
 
