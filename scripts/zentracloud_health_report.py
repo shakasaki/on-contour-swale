@@ -159,25 +159,30 @@ def build_report() -> str:
             **info,
         })
 
-    tbl = pl.DataFrame(rows).sort(
-        ["serial", "port"]
-    )
+    # Port -1 is the logger's own signal-strength diagnostic, not a sensor.
+    tbl = pl.DataFrame(rows).filter(pl.col("port") >= 1).sort(["serial", "port"])
 
     faults = tbl.filter(pl.col("status").is_in(["DEAD", "DEGRADING", "INTERMITTENT"]))
     recovered = tbl.filter(pl.col("status") == "recovered")
 
-    def fmt_row(r: dict) -> str:
-        # Onset / last-OK only mean something for a sensor with a real fault.
-        show_dates = r["status"] != "healthy"
-        onset = (r["onset"] or "—") if show_dates else "—"
-        last_ok = (r["last_ok"] or "—") if show_dates else "—"
-        return (
-            f"| {r['serial']} | Port {r['port']} | {r['sensor_id']} "
-            f"| {r['display']} | {r['sensor_type']} "
-            f"| {r['depth_cm'] if r['depth_cm'] is not None else '—'} "
-            f"| {r['status']} | {100*r['overall_frac']:.1f}% | {100*r['recent_frac']:.1f}% "
-            f"| {last_ok} | {onset} |"
-        )
+    def _who(r: dict) -> str:
+        depth = f"{r['depth_cm']} cm" if r["depth_cm"] is not None else "no depth"
+        disp = f"`{r['display']}`, " if r["display"] not in ("-", None) else ""
+        return (f"**{r['serial']} · {r['sensor_id']}** "
+                f"({disp}{r['sensor_type']}, {depth}, Port {r['port']})")
+
+    def fmt_fault(r: dict) -> str:
+        onset = r["onset"] or "?"
+        last_ok = f", last OK {r['last_ok']}" if r["last_ok"] else ""
+        tail = ""
+        if r["status"] == "recovered" and r["recovered_by"]:
+            tail = f", last flagged {r['recovered_by']}"
+        return (f"- {_who(r)} — **{r['status']}**, since {onset}{last_ok}{tail}. "
+                f"Flagged {100*r['overall_frac']:.1f}% all-time, "
+                f"{100*r['recent_frac']:.1f}% in the last {RECENT_DAYS} days.")
+
+    def fmt_ok(r: dict) -> str:
+        return f"- {_who(r)} — {r['status']}."
 
     lines: list[str] = []
     lines.append("# Field sensor faults — ZENTRA Cloud v5 data")
@@ -202,39 +207,25 @@ def build_report() -> str:
     lines.append("## Currently failing")
     lines.append("")
     if faults.height:
-        lines.append(
-            "| Logger | Port | Sensor | Display | Type | Depth cm | Status "
-            "| Flagged (all) | Flagged (last 14 d) | Last OK | Since |"
-        )
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
         for r in faults.iter_rows(named=True):
-            lines.append(fmt_row(r))
+            lines.append(fmt_fault(r))
     else:
-        lines.append("_None._")
+        lines.append("- _None._")
     lines.append("")
 
+    lines.append("## Recovered (had a fault window, now clean)")
+    lines.append("")
     if recovered.height:
-        lines.append("## Recovered (had a fault window, now clean)")
-        lines.append("")
-        lines.append(
-            "| Logger | Port | Sensor | Display | Type | Depth cm | Status "
-            "| Flagged (all) | Flagged (last 14 d) | Last OK | Since |"
-        )
-        lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
         for r in recovered.iter_rows(named=True):
-            rr = dict(r)
-            lines.append(fmt_row(rr) + f"  <!-- recovered by {r['recovered_by']} -->")
-        lines.append("")
+            lines.append(fmt_fault(r))
+    else:
+        lines.append("- _None._")
+    lines.append("")
 
     lines.append("## All ports")
     lines.append("")
-    lines.append(
-        "| Logger | Port | Sensor | Display | Type | Depth cm | Status "
-        "| Flagged (all) | Flagged (last 14 d) | Last OK | Since |"
-    )
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
     for r in tbl.iter_rows(named=True):
-        lines.append(fmt_row(r))
+        lines.append(fmt_fault(r) if r["status"] != "healthy" else fmt_ok(r))
     lines.append("")
 
     return "\n".join(lines)
