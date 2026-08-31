@@ -254,3 +254,12 @@ Refines the earlier "swale 40 cm τ ≈ 3261 h" pooled headline.
 per-sensor source-coloured overlays for cross-source diff checking
 (loader internals). `first_two_weeks.png` — early equilibration
 exploration; superseded by `01_equilibration.png`.
+
+**`allrange_{soil,weather,housekeeping}_NN_YYYYMM-YYYYMM.png`** — full-record
+walk-through: every variable in consecutive 6-month windows from the first
+reading (2024-05), one figure per data-type group per window. *How:*
+`scripts/14_all_data_by_6mo.py`; hourly-mean line + hourly min–max shaded
+band, flagged readings (`error_code != 0`) nulled first; soil coloured by
+treatment and dashed by depth, housekeeping coloured by logger. *Why:* a
+no-cutoff eyeball pass over the whole raw record to spot gaps, steps, sensor
+deaths and seasonal structure before any analysis.
