@@ -3,6 +3,72 @@
 All notable changes to the swale project. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-09-01 — ZENTRA Cloud v5 wired into the loader; record extended to Aug 2026
+
+### Added
+- **`src/swale/readers.py::read_logger_parquet`**: reads a
+  `data/zentracloud/<serial>.parquet` dump (from `fetch_zentracloud.py`)
+  into the same long format as `read_logger_csv`. v5 `datetime` (UTC) is
+  converted to naive field-local time via `Asia/Kolkata` (IST, +5:30, no
+  DST — Sadhana Forest, Auroville; offset pinned by r=1.000 soil-temp
+  cross-correlation vs the CSV). Unmapped v5 measurements (`Raw VWC`,
+  `Pore Water EC`, `Dew Point`, `Signal`) are dropped.
+- **`error_code`** column added to the loader's long schema (`Int32`, null
+  for CSV/XLSX rows, the METER quality code for v5 rows). Carried through
+  dedup and reindex; left null on synthetic grid rows.
+- **`schema.py`**: `V5_MEASUREMENT_MAP`, `V5_SENSOR_TYPE_MAP`,
+  `normalize_v5_measurement`, `normalize_v5_sensor_type`.
+- **`sat_extract_ec`** as a distinct variable (see Changed / EC split).
+- **`scripts/zentracloud_health_report.py`** + **`notes/field_sensor_faults.md`**:
+  classifies every logger port by its `error_code` history and writes a
+  list-format report of which datalogger + sensor is failing and since
+  when. Full v5 history: `z6-19574` SMS09/`sw_b2_40` dead since 2026-03-28,
+  SMS08/`sw_b2_10` degrading since 2025-01-24, SMS06/`sw_b1_10` an episodic
+  2025/2026 fault (recovered).
+- **`scripts/14_all_data_by_6mo.py`**: full-record walk-through — every
+  variable in consecutive 6-month windows from the first reading, one
+  figure per data-type group (soil / weather / housekeeping) per window;
+  hourly-mean line + hourly min–max shaded band, flagged readings nulled,
+  no equilibration cutoff. 15 figures (`plots/allrange_*.png`).
+
+### Changed
+- **`src/swale/loader.py`**: `load_swale_dataset` gains a `zentracloud_dir`
+  arg (`"auto"` → `<data_root>/../zentracloud`, `None` to skip); v5 parquets
+  are discovered and read alongside CSV/XLSX. `_SOURCE_PRIORITY` is now
+  `{xlsx: 0, zentracloud: 1, csv: 2}` — v5 is full precision and current, so
+  it wins over the display-rounded CSV in the overlap; CSV now only fills
+  history predating each logger's v5 record (~24k rows survive dedup). The
+  loaded dataset spans 2024-05-25 → 2026-08-29 (was → 2026-05-11), 17.1M
+  rows.
+- **EC split** (resolves the long-standing alias): the CSV's single
+  "Saturation Extract EC" column and v5 "Saturation Extract EC" now map to
+  `sat_extract_ec` (the continuous 2024→now series, i.e. the old `bulk_ec`);
+  v5 "Bulk EC" maps to `bulk_ec` (v5-era only). Downstream renamed
+  `bulk_ec` → `sat_extract_ec` in `scripts/01_data_quality.py`,
+  `scripts/diagnose_jumps.py`, `config/settings.json` `equilibration.variables`
+  and its `src/swale/config.py` default.
+- **Full v5 history fetched** (`fetch_zentracloud.py --start 2024-05-01`):
+  ~7.2–9.1M readings/logger to `data/zentracloud/*.parquet`.
+
+### Fixed
+- **`scripts/05_rising_limb_metrics.py`**: `measure_event` returns a Python
+  `datetime` / `None` for `peak_time` instead of `np.datetime64("NaT")` —
+  `pl.from_dicts` can't mix `NaT` with the `None` yielded when a sensor has
+  no post-event data (now reachable with the longer record).
+
+### Removed
+- **`scripts/fetch_zentracloud_legacy.py`**: the v3/v4 REST path is
+  unreachable now the account is on ZENTRA Cloud 2.0.
+
+### Known issues
+- `scripts/11_per_location_tau.py` is blocked on absent
+  `data/DEM_xyz/24.05.30_-_con_sw_and_for_*.xyz` dense scans (pre-existing,
+  hillshade rendering only — the τ computation is unaffected).
+- `notes/figures_index.md` text still references the old 2026-05 end date
+  for the pre-existing figures.
+- Scripts 02 / 02b / 03 / 09 / 12* not yet re-run against the extended
+  record.
+
 ## 2026-08-26 — Desktop memory-sync fix, SMS line transects, ZentraCloud fetch scripts
 
 ### Added
