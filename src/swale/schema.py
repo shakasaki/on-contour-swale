@@ -57,11 +57,13 @@ KEPT_SENSOR_TYPES: frozenset[str] = frozenset(
 # Lowercase + collapse whitespace + strip the unit prefix is the cleanest
 # normalization. We key the map on a canonical "compact" form.
 #
-# Note: "Saturation Extract EC" (CSV) and "Bulk EC" (Excel) are NOT physically
-# the same quantity — Bulk EC is the raw measurement; Saturation Extract EC is
-# a derived/calibrated value. They are stored in the same column position by
-# the export software, and per the user we treat them as the same logical
-# variable here ("bulk_ec"). This decision is flagged for follow-up.
+# Note: "Saturation Extract EC" and "Bulk EC" are NOT physically the same
+# quantity — Bulk EC is the raw sensor measurement; Saturation Extract EC is a
+# derived/calibrated value (typically 2–3× larger). The CSV exports only ever
+# carried the "Saturation Extract EC" column, so it maps to ``sat_extract_ec``
+# — the continuous 2024→now series. "Bulk EC" only appears in XLSX snapshots
+# and the ZENTRA Cloud v5 API and maps to ``bulk_ec``. See
+# ``bulk_ec_alias_decision`` in memory for the history of this split.
 # ---------------------------------------------------------------------------
 
 VARIABLE_MAP: dict[str, str] = {
@@ -70,7 +72,7 @@ VARIABLE_MAP: dict[str, str] = {
     "m³/m³ water content":           "moisture",
     "degree_c soil temperature":     "soil_temp",
     "°c soil temperature":           "soil_temp",
-    "ms/cm saturation extract ec":   "bulk_ec",
+    "ms/cm saturation extract ec":   "sat_extract_ec",
     "ms/cm bulk ec":                 "bulk_ec",
     # ATMOS 14
     "degree_c air temperature":      "air_temp",
@@ -97,6 +99,7 @@ VARIABLE_UNITS: dict[str, str] = {
     "moisture":         "m3/m3",
     "soil_temp":        "degC",
     "bulk_ec":          "mS/cm",
+    "sat_extract_ec":   "mS/cm",
     "air_temp":         "degC",
     "humidity":         "%RH",
     "vapor_pressure":   "kPa",
@@ -109,6 +112,75 @@ VARIABLE_UNITS: dict[str, str] = {
     "ref_pressure":     "kPa",
     "logger_temp":      "degC",
 }
+
+# ---------------------------------------------------------------------------
+# ZENTRA Cloud v5 API measurement names -> canonical variable.
+#
+# The v5 ``Reading.measurement`` strings are clean and stable, so we key on
+# them directly rather than reconstructing a "unit + name" header string.
+#
+# Differences from the CSV/XLSX exports:
+#   * v5 exposes "Bulk EC" and "Saturation Extract EC" as SEPARATE series,
+#     mapped to ``bulk_ec`` and ``sat_extract_ec`` respectively — the same
+#     split as ``VARIABLE_MAP`` above. ``sat_extract_ec`` is the continuous
+#     series (CSV history + v5); ``bulk_ec`` is v5-era only. See
+#     ``bulk_ec_alias_decision`` in memory.
+#   * "Raw VWC", "Pore Water EC", "Dew Point" and "Signal" have no CSV
+#     counterpart and are not used downstream -> dropped.
+# ---------------------------------------------------------------------------
+
+V5_MEASUREMENT_MAP: dict[str, str] = {
+    "Water Content":          "moisture",
+    "Soil Temperature":       "soil_temp",
+    "Bulk EC":                "bulk_ec",
+    "Saturation Extract EC":  "sat_extract_ec",
+    "Air Temperature":        "air_temp",
+    "Atmospheric Pressure":   "atm_pressure",
+    "Relative Humidity":      "humidity",
+    "VPD":                    "vpd",
+    "Vapor Pressure":         "vapor_pressure",
+    "Precipitation":          "precipitation",
+    "Max Precip Rate":        "max_precip_rate",
+    "Battery Percent":        "battery_pct",
+    "Battery Voltage":        "battery_mv",
+    "Reference Pressure":     "ref_pressure",
+    "Logger Temperature":     "logger_temp",
+}
+
+# v5 measurements we deliberately drop (no CSV counterpart, unused downstream).
+V5_DROP_MEASUREMENTS: frozenset[str] = frozenset(
+    {"Raw VWC", "Pore Water EC", "Dew Point", "Signal"}
+)
+
+# v5 ``sensor_name`` strings -> canonical sensor type. Mostly the same words
+# as the CSV/XLSX row-2 labels, minus the trailing description.
+V5_SENSOR_TYPE_MAP: dict[str, str] = {
+    "TEROS 12":        "TEROS12",
+    "ATMOS 14":        "ATMOS14",
+    "ECRN-100":        "ECRN100",
+    "Battery":         "BATTERY",
+    "Barometer":       "BAROMETER",
+    "Signal Strength": "SIGNAL",
+}
+
+
+def normalize_v5_sensor_type(raw: str | None) -> str | None:
+    """Map a v5 ``Reading.sensor_name`` to a canonical sensor-type token."""
+    if not isinstance(raw, str):
+        return None
+    return V5_SENSOR_TYPE_MAP.get(raw.strip())
+
+
+def normalize_v5_measurement(raw: str | None) -> str | None:
+    """Map a v5 ``Reading.measurement`` to a canonical variable name.
+
+    Returns None for measurements we drop (``V5_DROP_MEASUREMENTS``) or for
+    anything unrecognised — the caller decides whether to warn.
+    """
+    if not isinstance(raw, str):
+        return None
+    return V5_MEASUREMENT_MAP.get(raw.strip())
+
 
 # ---------------------------------------------------------------------------
 # Port label parser. Excel uses "Port 1" (with space), CSV uses "Port1".

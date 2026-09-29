@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime, timezone
 from pathlib import Path
 
 import openpyxl
+import polars as pl
 
 
 def make_csv_fixture(
@@ -99,6 +101,48 @@ def make_xlsx_fixture(
             ws.append(list(r))
     wb.save(path)
     wb.close()
+    return path
+
+
+def make_v5_parquet_fixture(
+    path: Path,
+    *,
+    rows: list[tuple] = (),
+) -> Path:
+    """Write a ZENTRA Cloud v5 dump parquet like ``fetch_zentracloud.py``.
+
+    ``rows`` is a list of
+    ``(datetime_utc, port_num, sensor_name, measurement, value, unit, error_code)``
+    tuples. ``datetime_utc`` may be a tz-aware or naive (treated UTC) datetime.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    recs = []
+    for dt_utc, port, sname, meas, val, unit, err in rows:
+        if dt_utc.tzinfo is None:
+            dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+        recs.append({
+            "device_id": "z6-00000",
+            "datetime": dt_utc,
+            "timestamp": dt_utc.timestamp(),
+            "port_num": port,
+            "sensor_name": sname,
+            "measurement": meas,
+            "value": val,
+            "unit": unit,
+            "error_code": err,
+        })
+    schema = {
+        "device_id": pl.Utf8,
+        "datetime": pl.Datetime("us", "UTC"),
+        "timestamp": pl.Float64,
+        "port_num": pl.Int64,
+        "sensor_name": pl.Utf8,
+        "measurement": pl.Utf8,
+        "value": pl.Float64,
+        "unit": pl.Utf8,
+        "error_code": pl.Int64,
+    }
+    pl.DataFrame(recs, schema=schema).write_parquet(path)
     return path
 
 

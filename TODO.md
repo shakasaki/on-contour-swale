@@ -1,5 +1,43 @@
 # TODO
 
+## 2026-08-29 — bottom logger TEROS 12 faults (full v5 history)
+- [ ] **`z6-19574` (bottom) — probe faults, on-site action needed.** From the
+  full v5 history (`notes/field_sensor_faults.md`):
+  - **SMS09 / `sw_b2_40` (Port 6): DEAD since 2026-03-28** — clean for ~22
+    months, then 12 % in March, 100 % from April. **Replace probe.**
+  - **SMS08 / `sw_b2_10` (Port 5): degrading since 2025-01-24** — ~20–25 %
+    flagged, intermittent. **Reseat/replace.**
+  - **SMS06 / `sw_b1_10` (Port 3): episodic** — bad Feb–Mar 2025 and
+    Mar–Aug 2026, recovered since 2026-08-03. Watch.
+  - Both SwF ("Bottom 2") depths compromised → SwF unusable as a clean
+    slope-position pair after early 2025.
+  - Loader carries `error_code`; analyses must filter `== 0`
+    (flagged v5 rows still have a bogus `value`, often 0.0).
+
+## 2026-08-29 — ZentraCloud v5 wired into loader
+- [ ] **`notes/figures_index.md` — refresh text for the new date range**
+  (dataset now 2024-05 → 2026-08, was → 2026-05).
+- [ ] **`scripts/11_per_location_tau.py` blocked** — needs the 5 dense
+  `data/DEM_xyz/24.05.30_-_con_sw_and_for_*.xyz` scans (only `*_11_59_00.xyz`
+  is in the checkout). Pre-existing; unrelated to the v5 work. τ math is
+  fine, only the hillshade map background fails.
+- [ ] **Re-run remaining scripts** not yet checked after the loader change:
+  02 / 02b / 03 (spectra), 09, 12* (DEM overlays).
+
+## 2026-08-26 — ZentraCloud fetch
+- [x] **v5 fetch verified against a live account (2026-08-29)** — account
+  migrated to ZENTRA Cloud 2.0; `fetch_zentracloud.py` runs end-to-end,
+  device IDs confirmed. `fetch_zentracloud_legacy.py` deleted (v3/v4 path
+  unreachable).
+- [x] **Rotated the ZentraCloud API token (2026-08-29)** — earlier tokens
+  pasted into chat 2026-08-26 / 08-28 are dead; current key lives in
+  `~/.zentracloud.env` (mode 600), not in shell rc or chat.
+- [x] **Map ZentraCloud readings onto `swale`'s canonical schema (2026-08-29)**
+  — `read_logger_parquet` + `V5_MEASUREMENT_MAP`/`V5_SENSOR_TYPE_MAP`; wired
+  into `load_swale_dataset` as a source with priority above CSV; IST tz
+  conversion; `error_code` column added; EC split into
+  `sat_extract_ec`/`bulk_ec`. See memory `project_zentracloud_fetch`.
+
 ## 2026-06-17 — Hand-picked sensor locations
 - [x] **Interactive picker + picked-locations default** — `scripts/16_pick_sensor_locations.py` (DEM hillshade, draggable markers, `s`/`r`); `data/SMS_locations_picked.csv` is now the default via `swale.sites.default_locations_csv()`; scripts 09/11/12/12b/12d routed through it. Raw `SMS_locations.csv` kept pristine. SMS10 survey-1 X/Y were transposed; fixed by hand-picking, not the (wrong) in-place swap.
 - [ ] **Save the picked→schema generator as `scripts/16b_apply_picked_locations.py`** — the inline script that turns `plots/picked_sensor_locations.csv` + raw survey into `data/SMS_locations_picked.csv` was run ad-hoc and not saved. After any re-pick, the picked file currently can't be regenerated without re-deriving it. Make pick→apply reproducible.

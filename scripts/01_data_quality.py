@@ -160,7 +160,7 @@ def plot_soil(df: pl.DataFrame, out: Path) -> None:
 
     variables = [("moisture", "Soil moisture (m³/m³)"),
                  ("soil_temp", "Soil temperature (°C)"),
-                 ("bulk_ec", "Bulk EC (mS/cm)")]
+                 ("sat_extract_ec", "Sat. extract EC (mS/cm)")]
 
     fig, axes = plt.subplots(len(DEPTH_FACETS), len(variables),
                               figsize=(15, 10), sharex=True)
@@ -223,7 +223,7 @@ def plot_soil(df: pl.DataFrame, out: Path) -> None:
 EQUILIBRATION_VARIABLES: list[tuple[str, str]] = [
     ("moisture",  "VWC (m³/m³)"),
     ("soil_temp", "Soil temp (°C)"),
-    ("bulk_ec",   "Bulk EC (mS/cm)"),
+    ("sat_extract_ec", "Sat. extract EC (mS/cm)"),
 ]
 
 

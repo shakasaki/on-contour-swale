@@ -15,7 +15,7 @@ from typing import Literal
 import polars as pl
 
 from swale.metadata import parse_metadata
-from swale.readers import read_logger_csv, read_logger_xlsx
+from swale.readers import read_logger_csv, read_logger_parquet, read_logger_xlsx
 from swale.schema import (
     LOGGER_INFO,
     NON_FOREST_LOGGERS,
@@ -31,10 +31,12 @@ from swale.schema import (
 _ABS_TOL = 1e-3
 _REL_TOL = 1e-3
 
-# Source-format priority: lower wins on dedup. XLSX is preferred because
-# the CSV exports are rounded for display while the Excel snapshots carry
-# the full-precision calibrated values.
-_SOURCE_PRIORITY: dict[str, int] = {"xlsx": 0, "csv": 1}
+# Source-format priority: lower wins on dedup. XLSX snapshots carry the
+# full-precision calibrated values, so they win outright. The ZENTRA Cloud
+# v5 API also returns full precision and stays current, so it is preferred
+# over the display-rounded CSV exports in the overlap window; CSV only fills
+# history that predates each logger's v5 record.
+_SOURCE_PRIORITY: dict[str, int] = {"xlsx": 0, "zentracloud": 1, "csv": 2}
 
 # Plausibility window for timestamps. Anything outside this range is
 # treated as a logger clock glitch (e.g. battery-failure date resets) and
@@ -43,11 +45,16 @@ _MIN_PLAUSIBLE_YEAR = 2018
 _MAX_PLAUSIBLE_YEAR = 2030
 
 
-def _discover_files(data_root: Path) -> tuple[list[tuple[str, Path]],
-                                                list[tuple[str, Path]]]:
-    """Return (csv_jobs, xlsx_jobs) where each entry is (logger_serial, path)."""
+def _discover_files(
+    data_root: Path,
+    zentracloud_dir: Path | None,
+) -> tuple[list[tuple[str, Path]],
+           list[tuple[str, Path]],
+           list[tuple[str, Path]]]:
+    """Return (csv_jobs, xlsx_jobs, parquet_jobs); each entry is (serial, path)."""
     csv_jobs: list[tuple[str, Path]] = []
     xlsx_jobs: list[tuple[str, Path]] = []
+    parquet_jobs: list[tuple[str, Path]] = []
 
     for logger_serial in NON_FOREST_LOGGERS:
         logger_dir = data_root / logger_serial
@@ -66,12 +73,21 @@ def _discover_files(data_root: Path) -> tuple[list[tuple[str, Path]],
             if serial in NON_FOREST_LOGGERS:
                 xlsx_jobs.append((serial, xlsx_path))
 
-    return csv_jobs, xlsx_jobs
+    # ZENTRA Cloud v5 dumps: one <serial>.parquet per logger, written by
+    # scripts/fetch_zentracloud.py.
+    if zentracloud_dir is not None and Path(zentracloud_dir).is_dir():
+        for serial in NON_FOREST_LOGGERS:
+            pq = Path(zentracloud_dir) / f"{serial}.parquet"
+            if pq.is_file():
+                parquet_jobs.append((serial, pq))
+
+    return csv_jobs, xlsx_jobs, parquet_jobs
 
 
 def _read_all(
     csv_jobs: list[tuple[str, Path]],
     xlsx_jobs: list[tuple[str, Path]],
+    parquet_jobs: list[tuple[str, Path]],
 ) -> pl.DataFrame:
     """Run readers and stack with a logger_serial column attached."""
     frames: list[pl.DataFrame] = []
@@ -83,6 +99,12 @@ def _read_all(
             ))
     for serial, path in xlsx_jobs:
         df = read_logger_xlsx(path)
+        if df.height:
+            frames.append(df.with_columns(
+                pl.lit(serial).alias("logger_serial")
+            ))
+    for serial, path in parquet_jobs:
+        df = read_logger_parquet(path)
         if df.height:
             frames.append(df.with_columns(
                 pl.lit(serial).alias("logger_serial")
@@ -219,9 +241,10 @@ def _reindex_group(
                             maintain_order=True)
     # Forward-fill the metadata columns (sensor_id, port, treatment, etc.).
     # The 'value' column intentionally retains its nulls — those are the
-    # gaps the caller asked us to surface.
+    # gaps the caller asked us to surface — and so does 'error_code': a
+    # synthetic grid row is a gap, not a flagged reading.
     fill_cols = [c for c in upsampled.columns
-                 if c not in ("timestamp", "value")]
+                 if c not in ("timestamp", "value", "error_code")]
     upsampled = upsampled.with_columns([
         pl.col(c).forward_fill().backward_fill() for c in fill_cols
     ])
@@ -268,6 +291,7 @@ def load_swale_dataset(
     data_root: Path,
     metadata_xlsx: Path,
     *,
+    zentracloud_dir: Path | None | Literal["auto"] = "auto",
     cache_dir: Path | None = None,
     refresh: bool = False,
     grid: str | None | Literal["auto"] = "none",
@@ -281,6 +305,10 @@ def load_swale_dataset(
             of periodic Excel snapshots.
         metadata_xlsx: Path to the project's Metadata.xlsx with a 'Serials'
             tab.
+        zentracloud_dir: Folder holding ``<serial>.parquet`` dumps from
+            ``scripts/fetch_zentracloud.py``. ``"auto"`` (default) looks for
+            ``<data_root>/../zentracloud``. Pass an explicit path to override,
+            or ``None`` to skip the v5 source entirely.
         cache_dir: If given, results are written to (and on subsequent calls
             read from) ``cache_dir / logger=<serial>.parquet``. Set
             ``refresh=True`` to force a rebuild.
@@ -303,9 +331,11 @@ def load_swale_dataset(
         A long-format polars DataFrame with one row per
         (logger, sensor, variable, timestamp). Columns:
         ``timestamp, logger_serial, logger_alias, logger_location, port,
-        sensor_id, sensor_type, treatment, location, depth_cm, field_id,
-        location_notes, variable, value, source_format, source_file,
-        config_label``.
+        sensor_id, sensor_type, treatment, location, tag, depth_cm, field_id,
+        location_notes, variable, value, error_code, source_format,
+        source_file, config_label``. ``error_code`` is the METER quality
+        code from the ZENTRA Cloud v5 source (0 = OK, non-zero = flagged);
+        it is null for rows that came from CSV or XLSX exports.
 
     Raises:
         FileNotFoundError: If ``data_root`` or ``metadata_xlsx`` is missing.
@@ -333,14 +363,19 @@ def load_swale_dataset(
     if not metadata_xlsx.exists():
         raise FileNotFoundError(metadata_xlsx)
 
+    if zentracloud_dir == "auto":
+        zentracloud_dir = data_root.parent / "zentracloud"
+    elif zentracloud_dir is not None:
+        zentracloud_dir = Path(zentracloud_dir)
+
     if cache_dir is not None and not refresh:
         cached = _try_load_cache(cache_dir)
         if cached is not None:
             return cached
 
     sensors, port_mapping = parse_metadata(metadata_xlsx)
-    csv_jobs, xlsx_jobs = _discover_files(data_root)
-    raw = _read_all(csv_jobs, xlsx_jobs)
+    csv_jobs, xlsx_jobs, parquet_jobs = _discover_files(data_root, zentracloud_dir)
+    raw = _read_all(csv_jobs, xlsx_jobs, parquet_jobs)
     if raw.height == 0:
         warnings.warn("No data files found under data_root.")
         return raw
@@ -362,7 +397,7 @@ def load_swale_dataset(
         "port", "sensor_id", "sensor_type",
         "treatment", "location", "tag", "depth_cm",
         "field_id", "location_notes",
-        "variable", "value",
+        "variable", "value", "error_code",
         "source_format", "source_file", "config_label",
     ]
     reindexed = reindexed.select([c for c in column_order

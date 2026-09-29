@@ -151,7 +151,7 @@ def main() -> None:
     soil = df.filter(pl.col("sensor_type") == "TEROS12")
 
     # Plots
-    for var in ("bulk_ec", "moisture", "soil_temp"):
+    for var in ("sat_extract_ec", "moisture", "soil_temp"):
         out = PLOTS / f"diag_{var}.png"
         print(f"  -> {out}")
         plot_source_overlay(soil, variable=var, out=out)
